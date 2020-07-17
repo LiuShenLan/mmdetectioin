@@ -16,7 +16,7 @@ from .custom import CustomDataset
 
 
 @DATASETS.register_module()
-class CitypersonsDataset(CustomDataset):
+class CitypersonsCocoDataset(CustomDataset):
 
     CLASSES = ('ignore', 'pedestrians', 'riders', 'sitting', 'other', 'group')
 

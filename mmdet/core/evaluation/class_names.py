@@ -1,9 +1,15 @@
 import mmcv
 
-def citypersons_classes():
+def citypersonscoco_classes():
     return [
         'ignore', 'pedestrians', 'riders', 'sitting', 'other', 'group'
     ]
+
+def citypersonsvoc_classes():
+    return [
+        'ignore', 'pedestrians', 'riders', 'sitting', 'other', 'group'
+    ]
+
 def wider_face_classes():
     return ['face']
 
@@ -99,8 +105,9 @@ dataset_aliases = {
     'coco': ['coco', 'mscoco', 'ms_coco'],
     'wider_face': ['WIDERFaceDataset', 'wider_face', 'WDIERFace'],
     'cityscapes': ['cityscapes'],
-    
-    'citypersons': ['citypersons'],
+
+    'citypersonscoco': ['citypersonscoco'],
+    'citypersonsvoc': ['citypersonsvoc']
 }
 
 

@@ -1,4 +1,5 @@
-dataset_type = 'CitypersonsDataset'
+dataset_type = 'CitypersonsCocoDataset'
+# dataset_type = 'CityscapesDataset'
 data_root = 'data/cityscapes/'
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
@@ -29,27 +30,24 @@ test_pipeline = [
         ])
 ]
 data = dict(
-    samples_per_gpu=1,
-    workers_per_gpu=1,
+    samples_per_gpu=2,
+    workers_per_gpu=2,
     train=dict(
         type='RepeatDataset',
         times=8,
         dataset=dict(
             type=dataset_type,
-            ann_file=data_root +
-            'annotations/train.json',
+            ann_file=data_root + 'annotations/train.json',
             img_prefix=data_root + 'leftImg8bit/train/',
             pipeline=train_pipeline)),
     val=dict(
         type=dataset_type,
-        ann_file=data_root +
-        'annotations/val.json',
+        ann_file=data_root + 'annotations/val.json',
         img_prefix=data_root + 'leftImg8bit/val/',
         pipeline=test_pipeline),
     test=dict(
         type=dataset_type,
-        ann_file=data_root +
-        'annotations/val.json',
+        ann_file=data_root + 'annotations/val.json',
         img_prefix=data_root + 'leftImg8bit/val/',
         pipeline=test_pipeline))
 evaluation = dict(interval=1, metric='bbox')
