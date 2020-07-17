@@ -37,16 +37,16 @@ data = dict(
         dataset=dict(
             type=dataset_type,
             ann_file=data_root + 'ImageSets/Main/train.txt',
-            img_prefix=data_root + 'leftImg8bit/train/',
+            img_prefix=data_root,
             pipeline=train_pipeline)),
     val=dict(
         type=dataset_type,
         ann_file=data_root + 'ImageSets/Main/val.txt',
-        img_prefix=data_root + 'leftImg8bit/val/',
+        img_prefix=data_root,
         pipeline=test_pipeline),
     test=dict(
         type=dataset_type,
         ann_file=data_root + 'ImageSets/Main/val.txt',
-        img_prefix=data_root + 'leftImg8bit/val/',
+        img_prefix=data_root,
         pipeline=test_pipeline))
-evaluation = dict(interval=1, metric='bbox')
+evaluation = dict(interval=1, metric='mAP')

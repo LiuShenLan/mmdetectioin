@@ -9,7 +9,7 @@ class CitypersonsVocDataset(XMLDataset):
     CLASSES = ('ignore', 'pedestrians', 'riders', 'sitting', 'other', 'group')
 
     def __init__(self, **kwargs):
-        super(VOCDataset, self).__init__(**kwargs)
+        super(CitypersonsVocDataset, self).__init__(**kwargs)
         self.year = 2007
 
     def evaluate(self,
