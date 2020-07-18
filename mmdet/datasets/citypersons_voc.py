@@ -10,7 +10,7 @@ class CitypersonsVocDataset(XMLDataset):
 
     def __init__(self, **kwargs):
         super(CitypersonsVocDataset, self).__init__(**kwargs)
-        self.year = 2007
+        self.year = 2012
 
     def evaluate(self,
                  results,
