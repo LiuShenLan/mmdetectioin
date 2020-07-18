@@ -1,6 +1,6 @@
 _base_ = [
     '../_base_/datasets/citypersons_voc.py',
-    '../_base_/schedules/schedule_2x.py', '../_base_/default_runtime.py'
+    '../_base_/schedules/schedule_4x.py', '../_base_/default_runtime.py'
 ]
 model = dict(
     type='RepPointsDetector',
