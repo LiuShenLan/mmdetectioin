@@ -52,7 +52,7 @@ class CitypersonsVocDataset(XMLDataset):
         if metric == 'mAP':
             assert isinstance(iou_thr, float)
             if self.year == 2007:
-                ds_name = 'voc07'
+                ds_name = ['ignore', 'pedestrians', 'riders', 'sitting', 'other', 'group']
             else:
                 ds_name = self.dataset.CLASSES
             mean_ap, _ = eval_map(
