@@ -692,6 +692,9 @@ class RepPointsHead(AnchorFreeHead):
                                                 scale_factor, cfg, rescale,
                                                 nms)
             result_list.append(proposals)
+        
+        print("\n\nlen(result_list)={}\nproposals.shape={}".format(len(result_list),result_list[0].shape))
+        
         return result_list
 
     def _get_bboxes_single(self,

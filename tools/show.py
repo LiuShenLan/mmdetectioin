@@ -33,6 +33,9 @@ model = init_detector(config_file, checkpoint_file, device='cuda:0')
 
 # 测试一张图片并显示结果
 result = inference_detector(model, img)
+
+print("\n\nshow/result.shape={}".format(result.shape))
+
 if args.save == True:
     model.show_result(img, result, out_file=output_file)    # 保存可视化结果到文件
 else:
