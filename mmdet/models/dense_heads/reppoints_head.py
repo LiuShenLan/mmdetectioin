@@ -666,6 +666,14 @@ class RepPointsHead(AnchorFreeHead):
                    cfg=None,
                    rescale=False,
                    nms=True):
+        for i in range(len(cls_scores)):
+            print("cls_scores[{}].shape={}".format(i,cls_scores[i].shape))
+        for i in range(len(cls_scores)):
+            print("pts_preds_refine[{}].shape={}".format(i,pts_preds_refine[i].shape))
+        print("img_metas={}".format(img_metas))
+        print("nms=".format(nms))
+        print("rescale=".format(rescale))
+
         assert len(cls_scores) == len(pts_preds_refine)
         bbox_preds_refine = [
             self.points2bbox(pts_pred_refine)
