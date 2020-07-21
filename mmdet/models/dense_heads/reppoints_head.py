@@ -1,3 +1,5 @@
+import pickle
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -165,24 +167,24 @@ class RepPointsHead(AnchorFreeHead):
     def points2bbox(self, pts, y_first=True):
         """Converting the points set into bounding box.
 
-        :param pts: the input points sets (fields), each points
+        :param pts: the input points sets (fields), each points     [张数，18，feat_h,feat_w]
             set (fields) is represented as 2n scalar.
         :param y_first: if y_fisrt=True, the point set is represented as
             [y1, x1, y2, x2 ... yn, xn], otherwise the point set is
             represented as [x1, y1, x2, y2 ... xn, yn].
         :return: each points set is converting to a bbox [x1, y1, x2, y2].
         """
-        pts_reshape = pts.view(pts.shape[0], -1, 2, *pts.shape[2:])
-        pts_y = pts_reshape[:, :, 0, ...] if y_first else pts_reshape[:, :, 1,
+        pts_reshape = pts.view(pts.shape[0], -1, 2, *pts.shape[2:])     # [张数,9,2,h,w]
+        pts_y = pts_reshape[:, :, 0, ...] if y_first else pts_reshape[:, :, 1,  # [num,9,h,w]
                                                                       ...]
         pts_x = pts_reshape[:, :, 1, ...] if y_first else pts_reshape[:, :, 0,
                                                                       ...]
         if self.transform_method == 'minmax':
-            bbox_left = pts_x.min(dim=1, keepdim=True)[0]
+            bbox_left = pts_x.min(dim=1, keepdim=True)[0]   # [num,1,h,w]
             bbox_right = pts_x.max(dim=1, keepdim=True)[0]
             bbox_up = pts_y.min(dim=1, keepdim=True)[0]
             bbox_bottom = pts_y.max(dim=1, keepdim=True)[0]
-            bbox = torch.cat([bbox_left, bbox_up, bbox_right, bbox_bottom],
+            bbox = torch.cat([bbox_left, bbox_up, bbox_right, bbox_bottom],     # [num,4,h,w]
                              dim=1)
         elif self.transform_method == 'partial_minmax':
             pts_y = pts_y[:, :4, ...]
@@ -666,40 +668,49 @@ class RepPointsHead(AnchorFreeHead):
                    cfg=None,
                    rescale=False,
                    nms=True):
-        for i in range(len(cls_scores)):
-            print("cls_scores[{}].shape={}".format(i,cls_scores[i].shape))
-        for i in range(len(cls_scores)):
-            print("pts_preds_refine[{}].shape={}".format(i,pts_preds_refine[i].shape))
-        print("img_metas={}".format(img_metas))
-        print("nms={}".format(nms))
-        print("rescale={}".format(rescale))
-        # cls_scores:list,包含5个张量，分别为[1,6,128,256],[1,6,64,128],[32,64],[16,32],[8,16]
-        # pts_preds_refine:同cls_scores
-        # rescale:
-        # nms:
+        # cls_scores:list,包含5个张量，分别为[张数,6,feat_h,feat_w],因此为[level,num,6,h,w]
+        # pts_preds_refine:同cls_scores,为[level,num,18,h,w]
+        # rescale:True
+        # nms:True
+        # [feat_h,feat_w]=[128,256],[64,128],[32,64],[16,32],[8,16]
         assert len(cls_scores) == len(pts_preds_refine)
-        bbox_preds_refine = [
-            self.points2bbox(pts_pred_refine)
+        bbox_preds_refine = [   # [level,num,4,h,w]
+            self.points2bbox(pts_pred_refine)       # [张数,4,feat_h,feat_w]
             for pts_pred_refine in pts_preds_refine
         ]
-        num_levels = len(cls_scores)
-        mlvl_points = [
-            self.point_generators[i].grid_points(cls_scores[i].size()[-2:],
+        num_levels = len(cls_scores)    # 5
+        mlvl_points = [ # [level,h*w,3]
+            self.point_generators[i].grid_points(cls_scores[i].size()[-2:],     # [h*w,3]
                                                  self.point_strides[i])
             for i in range(num_levels)
         ]
         result_list = []
+
+        ### 保存points
+        points_pred_refine = [   # [level,num,18,h,w]
+            pts_pred_refine for pts_pred_refine in pts_preds_refine     # [num,18,h,w]
+        ]
+        ###
+
         for img_id in range(len(img_metas)):
-            cls_score_list = [
+            cls_score_list = [  # [level,6,h,w]
                 cls_scores[i][img_id].detach() for i in range(num_levels)
             ]
-            bbox_pred_list = [
+            bbox_pred_list = [  # [level,4,h,w]
                 bbox_preds_refine[i][img_id].detach()
                 for i in range(num_levels)
             ]
-            img_shape = img_metas[img_id]['img_shape']
-            scale_factor = img_metas[img_id]['scale_factor']
-            proposals = self._get_bboxes_single(cls_score_list, bbox_pred_list,
+
+            ### 保存points
+            points_pred_list = [  # [level,18,h,w]
+                points_pred_refine[i][img_id].detach()
+                for i in range(num_levels)
+            ]
+            ###
+            
+            img_shape = img_metas[img_id]['img_shape']      # (1024, 2048, 3)
+            scale_factor = img_metas[img_id]['scale_factor']    # array([1., 1., 1., 1.], dtype=float32)
+            proposals = self._get_bboxes_single_points(cls_score_list, bbox_pred_list,points_pred_list, ###
                                                 mlvl_points, img_shape,
                                                 scale_factor, cfg, rescale,
                                                 nms)
@@ -709,31 +720,41 @@ class RepPointsHead(AnchorFreeHead):
         # tensor1为n*1,为检测到的bbox的class
 
         return result_list
-
-    def _get_bboxes_single(self,
-                           cls_scores,
-                           bbox_preds,
-                           mlvl_points,
-                           img_shape,
-                           scale_factor,
+    
+    def _get_bboxes_single_points(self,
+                           cls_scores,  # [level,6,h,w]
+                           bbox_preds,  # [level,4,h,w]
+                           points_preds,# [level,18,h,w]    ###
+                           mlvl_points, # [level,h*w,3]     网格点
+                           img_shape,   # (1024, 2048, 3)
+                           scale_factor,# array([1., 1., 1., 1.], dtype=float32)
                            cfg,
-                           rescale=False,
-                           nms=True):
+                           rescale=False,   # True
+                           nms=True):   # True
         cfg = self.test_cfg if cfg is None else cfg
         assert len(cls_scores) == len(bbox_preds) == len(mlvl_points)
         mlvl_bboxes = []
         mlvl_scores = []
-        for i_lvl, (cls_score, bbox_pred, points) in enumerate(
-                zip(cls_scores, bbox_preds, mlvl_points)):
+        mlvl_reppoints = []     ###
+        for i_lvl, (cls_score, bbox_pred, points, rep_points_pred) in enumerate(
+                zip(cls_scores, bbox_preds, mlvl_points, points_preds)):
             assert cls_score.size()[-2:] == bbox_pred.size()[-2:]
-            cls_score = cls_score.permute(1, 2,
+            cls_score = cls_score.permute(1, 2,     # [h*w,6]
                                           0).reshape(-1, self.cls_out_channels)
             if self.use_sigmoid_cls:
                 scores = cls_score.sigmoid()
             else:
                 scores = cls_score.softmax(-1)
-            bbox_pred = bbox_pred.permute(1, 2, 0).reshape(-1, 4)
-            nms_pre = cfg.get('nms_pre', -1)
+            bbox_pred = bbox_pred.permute(1, 2, 0).reshape(-1, 4)   # [h*w,4]
+
+            ###
+            rep_points_pred = bbox_pred.permute(1, 2, 0).reshape(-1,9,2)   # [h*w,9,2]
+            y = rep_points_pred[:,:,0].view(rep_points_pred.shape[0],rep_points_pred.shape[1],1)      # [h*w,9,1]
+            x = rep_points_pred[:,:,1].view(rep_points_pred.shape[0],rep_points_pred.shape[1],1)
+            rep_points_pred = torch.cat((x,y),dim=-1)   # [h*w,9,2]
+            ###
+            
+            nms_pre = cfg.get('nms_pre', -1)    # 1000  nms前最大bbox数
             if nms_pre > 0 and scores.shape[0] > nms_pre:
                 if self.use_sigmoid_cls:
                     max_scores, _ = scores.max(dim=1)
@@ -742,20 +763,116 @@ class RepPointsHead(AnchorFreeHead):
                     # since mmdet v2.0
                     # BG cat_id: num_class
                     max_scores, _ = scores[:, :-1].max(dim=1)
-                _, topk_inds = max_scores.topk(nms_pre)
-                points = points[topk_inds, :]
-                bbox_pred = bbox_pred[topk_inds, :]
-                scores = scores[topk_inds, :]
+                _, topk_inds = max_scores.topk(nms_pre) # 取top k个值
+                points = points[topk_inds, :]       # [h*w,3]
+                bbox_pred = bbox_pred[topk_inds, :] # [h*w,4]
+                rep_points_pred = rep_points_pred[topk_inds, :] # [h*w,18]  ###
+                scores = scores[topk_inds, :]       # 
             bbox_pos_center = torch.cat([points[:, :2], points[:, :2]], dim=1)
-            bboxes = bbox_pred * self.point_strides[i_lvl] + bbox_pos_center
-            x1 = bboxes[:, 0].clamp(min=0, max=img_shape[1])
+
+            ###
+            rep_points_center = points[:, :2].view(points.shape[0],1,2).repeat(1,9,1)   # [h*w,1,2].repeat(1,9,1)=[h*w,9,2]
+            reppoints = rep_points_pred * self.point_strides[i_lvl] + rep_points_center # [h*w,9,2]
+            rep_points_x = reppoints[:,:,0].clamp(min=0, max=img_shape[1])  # [h*w,9]
+            rep_points_y = reppoints[:,:,1].clamp(min=0, max=img_shape[0])  # [h*w,9]
+            reppoints = torch.stack([rep_points_x, rep_points_y], dim=-1)   # [h*w,9,2]
+            ###
+
+            bboxes = bbox_pred * self.point_strides[i_lvl] + bbox_pos_center    # [h*w,4]
+            # 将bbox的值限制在image_scale
+            x1 = bboxes[:, 0].clamp(min=0, max=img_shape[1])    # [h*w,1]
             y1 = bboxes[:, 1].clamp(min=0, max=img_shape[0])
             x2 = bboxes[:, 2].clamp(min=0, max=img_shape[1])
             y2 = bboxes[:, 3].clamp(min=0, max=img_shape[0])
-            bboxes = torch.stack([x1, y1, x2, y2], dim=-1)
+            bboxes = torch.stack([x1, y1, x2, y2], dim=-1)      # [h*w,4]
             mlvl_bboxes.append(bboxes)
             mlvl_scores.append(scores)
-        mlvl_bboxes = torch.cat(mlvl_bboxes)
+
+            mlvl_reppoints.append(reppoints)        ###
+
+        mlvl_bboxes = torch.cat(mlvl_bboxes)    # [level*h*w,9,2]
+        mlvl_reppoints = torch.cat(mlvl_reppoints)    # [level*h*w,4]   ###
+        if rescale:
+            mlvl_bboxes /= mlvl_bboxes.new_tensor(scale_factor)
+            mlvl_reppoints /= mlvl_reppoints.new_tensor(scale_factor)   ###
+
+        mlvl_scores = torch.cat(mlvl_scores)
+        if self.use_sigmoid_cls:
+            # Add a dummy background class to the backend when using sigmoid
+            # remind that we set FG labels to [0, num_class-1] since mmdet v2.0
+            # BG cat_id: num_class
+            padding = mlvl_scores.new_zeros(mlvl_scores.shape[0], 1)
+            mlvl_scores = torch.cat([mlvl_scores, padding], dim=1)
+        
+        ### Save
+        num_classes = mlvl_scores.size(1) - 1
+        reppoints_save = mlvl_reppoints[:, None].expand(-1, num_classes, 9,2)   # [level*h*w, classes, 9,2]
+        scores = mlvl_scores[:, :-1]    # [level*h*w,classes]
+        valid_mask = scores > 0.05      # [level*h*w,classes] = T or F
+        reppoints_save = reppoints_save[valid_mask]         # [level*h*w*classes, 9,2]
+        # save reppoints_save
+        pickle_file = "/root/data/shenlan/experiments/rep_cp_showshape/point.pkl"
+        with open(pickle_file,'wb') as f:
+            pickle.dump(reppoints_save,f)
+        # with open(pickle_file,'rb') as f:
+        #     data = pickle.load(reppoints_save)
+        ###
+
+        if nms:
+            det_bboxes, det_labels = multiclass_nms(mlvl_bboxes, mlvl_scores,
+                                                    cfg.score_thr, cfg.nms,
+                                                    cfg.max_per_img)
+            return det_bboxes, det_labels
+        else:
+            return mlvl_bboxes, mlvl_scores
+
+    def _get_bboxes_single(self,
+                           cls_scores,  # [level,6,h,w]
+                           bbox_preds,  # [level,4,h,w]
+                           mlvl_points, # [level,h*w,3]     网格点
+                           img_shape,   # (1024, 2048, 3)
+                           scale_factor,# array([1., 1., 1., 1.], dtype=float32)
+                           cfg,
+                           rescale=False,   # True
+                           nms=True):   # True
+        cfg = self.test_cfg if cfg is None else cfg
+        assert len(cls_scores) == len(bbox_preds) == len(mlvl_points)
+        mlvl_bboxes = []
+        mlvl_scores = []
+        for i_lvl, (cls_score, bbox_pred, points) in enumerate(
+                zip(cls_scores, bbox_preds, mlvl_points)):
+            assert cls_score.size()[-2:] == bbox_pred.size()[-2:]
+            cls_score = cls_score.permute(1, 2,     # [h*w,6]
+                                          0).reshape(-1, self.cls_out_channels)
+            if self.use_sigmoid_cls:
+                scores = cls_score.sigmoid()
+            else:
+                scores = cls_score.softmax(-1)
+            bbox_pred = bbox_pred.permute(1, 2, 0).reshape(-1, 4)   # [h*w,4]
+            nms_pre = cfg.get('nms_pre', -1)    # 1000  nms前最大bbox数
+            if nms_pre > 0 and scores.shape[0] > nms_pre:
+                if self.use_sigmoid_cls:
+                    max_scores, _ = scores.max(dim=1)
+                else:
+                    # remind that we set FG labels to [0, num_class-1]
+                    # since mmdet v2.0
+                    # BG cat_id: num_class
+                    max_scores, _ = scores[:, :-1].max(dim=1)
+                _, topk_inds = max_scores.topk(nms_pre) # 取top k个值
+                points = points[topk_inds, :]       # [h*w,3]
+                bbox_pred = bbox_pred[topk_inds, :] # [h*w,4]
+                scores = scores[topk_inds, :]       # 
+            bbox_pos_center = torch.cat([points[:, :2], points[:, :2]], dim=1)
+            bboxes = bbox_pred * self.point_strides[i_lvl] + bbox_pos_center    # [h*w,4]
+            # 将bbox的值限制在image_scale
+            x1 = bboxes[:, 0].clamp(min=0, max=img_shape[1])    # [h*w,1]
+            y1 = bboxes[:, 1].clamp(min=0, max=img_shape[0])
+            x2 = bboxes[:, 2].clamp(min=0, max=img_shape[1])
+            y2 = bboxes[:, 3].clamp(min=0, max=img_shape[0])
+            bboxes = torch.stack([x1, y1, x2, y2], dim=-1)      # [h*w,4]
+            mlvl_bboxes.append(bboxes)
+            mlvl_scores.append(scores)
+        mlvl_bboxes = torch.cat(mlvl_bboxes)    # [level*h*w,4]
         if rescale:
             mlvl_bboxes /= mlvl_bboxes.new_tensor(scale_factor)
         mlvl_scores = torch.cat(mlvl_scores)

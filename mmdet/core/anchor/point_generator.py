@@ -7,8 +7,8 @@ from .builder import ANCHOR_GENERATORS
 class PointGenerator(object):
 
     def _meshgrid(self, x, y, row_major=True):
-        xx = x.repeat(len(y))
-        yy = y.view(-1, 1).repeat(1, len(x)).view(-1)
+        xx = x.repeat(len(y))   # [w*h]=[0,s,s*2,...s*(w-1),0,s,s*2,...s*(w-1),...]
+        yy = y.view(-1, 1).repeat(1, len(x)).view(-1)   # [w*h]=[0,0,...,0,s,s,...,s,s*2,...]
         if row_major:
             return xx, yy
         else:
@@ -16,11 +16,11 @@ class PointGenerator(object):
 
     def grid_points(self, featmap_size, stride=16, device='cuda'):
         feat_h, feat_w = featmap_size
-        shift_x = torch.arange(0., feat_w, device=device) * stride
-        shift_y = torch.arange(0., feat_h, device=device) * stride
-        shift_xx, shift_yy = self._meshgrid(shift_x, shift_y)
-        stride = shift_x.new_full((shift_xx.shape[0], ), stride)
-        shifts = torch.stack([shift_xx, shift_yy, stride], dim=-1)
+        shift_x = torch.arange(0., feat_w, device=device) * stride  # [w]=range(w)*stride
+        shift_y = torch.arange(0., feat_h, device=device) * stride  # [h]=range(h)*stride
+        shift_xx, shift_yy = self._meshgrid(shift_x, shift_y)       # [w*h]
+        stride = shift_x.new_full((shift_xx.shape[0], ), stride)    # [w*h]
+        shifts = torch.stack([shift_xx, shift_yy, stride], dim=-1)  # [w*h,3]=[x,y,s],先遍历x
         all_points = shifts.to(device)
         return all_points
 

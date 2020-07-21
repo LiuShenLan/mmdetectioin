@@ -2,12 +2,12 @@ import torch
 from mmcv.ops.nms import batched_nms
 
 
-def multiclass_nms(multi_bboxes,
-                   multi_scores,
-                   score_thr,
-                   nms_cfg,
-                   max_num=-1,
-                   score_factors=None):
+def multiclass_nms(multi_bboxes,# [level*h*w,4]
+                   multi_scores,# [level*h*w,classes+1]
+                   score_thr,   # 0.05
+                   nms_cfg,     # dict(type='nms', iou_threshold=0.5)
+                   max_num=-1,  # 100
+                   score_factors=None): # None
     """NMS for multi-class bboxes.
 
     Args:
@@ -31,15 +31,15 @@ def multiclass_nms(multi_bboxes,
     if multi_bboxes.shape[1] > 4:
         bboxes = multi_bboxes.view(multi_scores.size(0), -1, 4)
     else:
-        bboxes = multi_bboxes[:, None].expand(-1, num_classes, 4)
-    scores = multi_scores[:, :-1]
+        bboxes = multi_bboxes[:, None].expand(-1, num_classes, 4)   # [level*h*w, classes, 4]
+    scores = multi_scores[:, :-1]   # [level*h*w,classes]
 
     # filter out boxes with low scores
-    valid_mask = scores > score_thr
-    bboxes = bboxes[valid_mask]
+    valid_mask = scores > score_thr     # [level*h*w,classes] = T or F
+    bboxes = bboxes[valid_mask]         # [level*h*w*classes, 4]
     if score_factors is not None:
         scores = scores * score_factors[:, None]
-    scores = scores[valid_mask]
+    scores = scores[valid_mask]         # [level*h*w*classes]
     labels = valid_mask.nonzero()[:, 1]
 
     if bboxes.numel() == 0:
