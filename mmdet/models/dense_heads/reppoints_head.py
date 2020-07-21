@@ -693,7 +693,7 @@ class RepPointsHead(AnchorFreeHead):
                                                 nms)
             result_list.append(proposals)
         
-        print("\n\nlen(result_list)={}\nproposals.shape={}".format(len(result_list),result_list[0].shape))
+        print("\n\nlen(result_list)={}\nproposals={}".format(len(result_list),result_list[0]))
         
         return result_list
 
