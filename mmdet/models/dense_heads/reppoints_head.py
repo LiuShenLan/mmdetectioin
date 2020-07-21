@@ -290,12 +290,6 @@ class RepPointsHead(AnchorFreeHead):
                 pts_out_refine, bbox_out_init.detach())
         else:
             pts_out_refine = pts_out_refine + pts_out_init.detach()
-        
-        print("\n\nrep_head_forward.py")
-        print("cls_out={}".format(cls_out))
-        print("cls_out.shape={}".format(cls_out.shape))
-        print("pts_out_refine.={}".format(pts_out_refine))
-        print("pts_out_refine.shape={}".format(pts_out_refine.shape))
 
         return cls_out, pts_out_init, pts_out_refine
 
@@ -699,14 +693,9 @@ class RepPointsHead(AnchorFreeHead):
                                                 scale_factor, cfg, rescale,
                                                 nms)
             result_list.append(proposals)
-        
-        print("\n\nrep_head.py\n\nlen(result_list)={}\n\nproposals={}\n{}{}".format(len(result_list),result_list[0],result_list[0][0].shape,result_list[0][1].shape))
-        print("\n\nrep_head_get_bbox.py")
-        print("result_list={}".format(result_list))
-        print("len(result_list)={}".format(len(result_list)))
-        print("len(result_list[0])={}".format(len(result_list[0])))
-        print("result_list[0][0].shape={}".format(result_list[0][0].shape))
-        print("result_list[0][1].shape={}".format(result_list[0][1].shape))
+        # result_list=[(tensor0, tensor1)]
+        # tensor0为n*5,n为检测到的bbox的数目，5为bbox+score
+        # tensor1为n*1,为检测到的bbox的class
 
         return result_list
 

@@ -33,13 +33,7 @@ model = init_detector(config_file, checkpoint_file, device='cuda:0')
 
 # 测试一张图片并显示结果
 result = inference_detector(model, img)
-
-print("\n\nshow.py")
-print("result={}".format(result))
-print("type(result)={}".format(type(result)))
-print("type(result[0])={}".format(type(result[0])))
-print("len(result)={}".format(len(result)))
-print("len(result[0])={}".format(len(result[0])))
+# result为list，包含6个元素，每个元素为n*5的np.array，n为对应class所预测到的bbox数目，5为bbox与score
 
 if args.save == True:
     model.show_result(img, result, out_file=output_file)    # 保存可视化结果到文件
