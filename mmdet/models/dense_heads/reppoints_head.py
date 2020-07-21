@@ -291,11 +291,11 @@ class RepPointsHead(AnchorFreeHead):
         else:
             pts_out_refine = pts_out_refine + pts_out_init.detach()
         
-        ptirn("\n\nrep_head_forward.py")
-        ptirn("cls_out={}".format(cls_out))
-        ptirn("cls_out.shape={}".format(cls_out.shape))
-        ptirn("pts_out_refine.={}".format(pts_out_refine))
-        ptirn("pts_out_refine.shape={}".format(pts_out_refine.shape))
+        print("\n\nrep_head_forward.py")
+        print("cls_out={}".format(cls_out))
+        print("cls_out.shape={}".format(cls_out.shape))
+        print("pts_out_refine.={}".format(pts_out_refine))
+        print("pts_out_refine.shape={}".format(pts_out_refine.shape))
 
         return cls_out, pts_out_init, pts_out_refine
 
@@ -701,12 +701,12 @@ class RepPointsHead(AnchorFreeHead):
             result_list.append(proposals)
         
         print("\n\nrep_head.py\n\nlen(result_list)={}\n\nproposals={}\n{}{}".format(len(result_list),result_list[0],result_list[0][0].shape,result_list[0][1].shape))
-        ptirn("\n\nrep_head_get_bbox.py")
-        ptirn("result_list={}".format(result_list))
-        ptirn("len(result_list)={}".format(len(result_list)))
-        ptirn("len(result_list[0])={}".format(len(result_list[0])))
-        ptirn("result_list[0][0].shape={}".format(result_list[0][0].shape))
-        ptirn("result_list[0][1].shape={}".format(result_list[0][1].shape))
+        print("\n\nrep_head_get_bbox.py")
+        print("result_list={}".format(result_list))
+        print("len(result_list)={}".format(len(result_list)))
+        print("len(result_list[0])={}".format(len(result_list[0])))
+        print("result_list[0][0].shape={}".format(result_list[0][0].shape))
+        print("result_list[0][1].shape={}".format(result_list[0][1].shape))
 
         return result_list
 

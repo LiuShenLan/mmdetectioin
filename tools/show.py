@@ -34,12 +34,12 @@ model = init_detector(config_file, checkpoint_file, device='cuda:0')
 # 测试一张图片并显示结果
 result = inference_detector(model, img)
 
-ptirn("\n\nshow.py")
-ptirn("result={}".format(result))
-ptirn("type(result)={}".format(type(result)))
-ptirn("type(result[0])={}".format(type(result[0]))
-ptirn("len(result)={}".format(len(result)))
-ptirn("len(result[0])={}".format(len(result[0]))
+print("\n\nshow.py")
+print("result={}".format(result))
+print("type(result)={}".format(type(result)))
+print("type(result[0])={}".format(type(result[0]))
+print("len(result)={}".format(len(result)))
+print("len(result[0])={}".format(len(result[0]))
 
 if args.save == True:
     model.show_result(img, result, out_file=output_file)    # 保存可视化结果到文件
