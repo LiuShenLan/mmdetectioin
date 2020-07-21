@@ -671,9 +671,12 @@ class RepPointsHead(AnchorFreeHead):
         for i in range(len(cls_scores)):
             print("pts_preds_refine[{}].shape={}".format(i,pts_preds_refine[i].shape))
         print("img_metas={}".format(img_metas))
-        print("nms=".format(nms))
-        print("rescale=".format(rescale))
-
+        print("nms={}".format(nms))
+        print("rescale={}".format(rescale))
+        # cls_scores:list,包含5个张量，分别为[1,6,128,256],[1,6,64,128],[32,64],[16,32],[8,16]
+        # pts_preds_refine:同cls_scores
+        # rescale:
+        # nms:
         assert len(cls_scores) == len(pts_preds_refine)
         bbox_preds_refine = [
             self.points2bbox(pts_pred_refine)
