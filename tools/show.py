@@ -37,7 +37,7 @@ result = inference_detector(model, img)
 print("\n\nshow.py")
 print("result={}".format(result))
 print("type(result)={}".format(type(result)))
-print("type(result[0])={}".format(type(result[0]))
+print("type(result[0])={}".format(type(result[0])))
 print("len(result)={}".format(len(result)))
 print("len(result[0])={}".format(len(result[0]))
 
