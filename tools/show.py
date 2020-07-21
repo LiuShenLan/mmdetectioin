@@ -39,7 +39,7 @@ print("result={}".format(result))
 print("type(result)={}".format(type(result)))
 print("type(result[0])={}".format(type(result[0])))
 print("len(result)={}".format(len(result)))
-print("len(result[0])={}".format(len(result[0]))
+print("len(result[0])={}".format(len(result[0])))
 
 if args.save == True:
     model.show_result(img, result, out_file=output_file)    # 保存可视化结果到文件
