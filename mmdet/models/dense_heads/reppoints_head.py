@@ -748,7 +748,7 @@ class RepPointsHead(AnchorFreeHead):
             bbox_pred = bbox_pred.permute(1, 2, 0).reshape(-1, 4)   # [h*w,4]
 
             ###
-            rep_points_pred = bbox_pred.permute(1, 2, 0).reshape(-1,9,2)   # [h*w,9,2]
+            rep_points_pred = rep_points_pred.permute(1, 2, 0).reshape(bbox_pred.shape[0],9,2)   # [h*w,9,2]
             y = rep_points_pred[:,:,0].view(rep_points_pred.shape[0],rep_points_pred.shape[1],1)      # [h*w,9,1]
             x = rep_points_pred[:,:,1].view(rep_points_pred.shape[0],rep_points_pred.shape[1],1)
             rep_points_pred = torch.cat((x,y),dim=-1)   # [h*w,9,2]
