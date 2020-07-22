@@ -811,7 +811,7 @@ class RepPointsHead(AnchorFreeHead):
         valid_mask = scores > 0.05      # [level*h*w,classes] = T or F
         reppoints_save = reppoints_save[valid_mask]         # [level*h*w*classes, 9,2]
         # save reppoints_save
-        pickle_file = "/root/data/shenlan/experiments/rep_cp_showshape/point_96_2.pkl"
+        pickle_file = "/root/data/shenlan/experiments/rep_cp_showshape/point_aa65.pkl"
         with open(pickle_file,'wb') as f:
             pickle.dump(reppoints_save,f)
         # with open(pickle_file,'rb') as f:
