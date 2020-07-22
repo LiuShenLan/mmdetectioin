@@ -794,7 +794,7 @@ class RepPointsHead(AnchorFreeHead):
         mlvl_reppoints = torch.cat(mlvl_reppoints)    # [level*h*w,4]   ###
         if rescale:
             mlvl_bboxes /= mlvl_bboxes.new_tensor(scale_factor)
-            mlvl_reppoints /= mlvl_reppoints.new_tensor(scale_factor)   ###
+            mlvl_reppoints /= mlvl_reppoints.new_tensor(scale_factor[:2])   ###
 
         mlvl_scores = torch.cat(mlvl_scores)
         if self.use_sigmoid_cls:
