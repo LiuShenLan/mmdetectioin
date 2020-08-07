@@ -106,8 +106,10 @@ class TwoStageDetector(BaseDetector):
                       img,
                       img_metas,
                       gt_bboxes,
+                      gt_keypoints,
                       gt_labels,
                       gt_bboxes_ignore=None,
+                      gt_keypoints_ignore=None,
                       gt_masks=None,
                       proposals=None,
                       **kwargs):

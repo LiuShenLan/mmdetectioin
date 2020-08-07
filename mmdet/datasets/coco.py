@@ -18,20 +18,7 @@ from .custom import CustomDataset
 @DATASETS.register_module()
 class CocoDataset(CustomDataset):
 
-    CLASSES = ('person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus',
-               'train', 'truck', 'boat', 'traffic light', 'fire hydrant',
-               'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog',
-               'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe',
-               'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee',
-               'skis', 'snowboard', 'sports ball', 'kite', 'baseball bat',
-               'baseball glove', 'skateboard', 'surfboard', 'tennis racket',
-               'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl',
-               'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot',
-               'hot dog', 'pizza', 'donut', 'cake', 'chair', 'couch',
-               'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop',
-               'mouse', 'remote', 'keyboard', 'cell phone', 'microwave',
-               'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock',
-               'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush')
+    CLASSES = ('person')
 
     def load_annotations(self, ann_file):
         """Load annotation from COCO style annotation file.
@@ -44,15 +31,15 @@ class CocoDataset(CustomDataset):
         """
 
         self.coco = COCO(ann_file)
-        self.cat_ids = self.coco.get_cat_ids(cat_names=self.CLASSES)
-        self.cat2label = {cat_id: i for i, cat_id in enumerate(self.cat_ids)}
-        self.img_ids = self.coco.get_img_ids()
+        self.cat_ids = self.coco.getCatIds(catNms=self.CLASSES)    # self.cat_ids = [1]
+        self.cat2label = {cat_id: i for i, cat_id in enumerate(self.cat_ids)}   # self.cat2label = {1: 0}
+        self.img_ids = self.coco.getImgIds()  # ["images":"id"构成的序列,...]
         data_infos = []
         for i in self.img_ids:
-            info = self.coco.load_imgs([i])[0]
-            info['filename'] = info['file_name']
+            info = self.coco.loadImgs([i])[0]      # "images"列表中的一项
+            info['filename'] = info['file_name']    # 将file_name中的数据复制到filename
             data_infos.append(info)
-        return data_infos
+        return data_infos   # [{},{},{},...{}]  {}为"images"列表中的一项    len(data_infos)=len(img_ids)
 
     def get_ann_info(self, idx):
         """Get COCO annotation by index.
@@ -64,10 +51,13 @@ class CocoDataset(CustomDataset):
             dict: Annotation info of specified index.
         """
 
-        img_id = self.data_infos[idx]['id']
-        ann_ids = self.coco.get_ann_ids(img_ids=[img_id])
-        ann_info = self.coco.load_anns(ann_ids)
+        img_id = self.data_infos[idx]['id']     # img_id="images":"id",一张图片的id
+        ann_ids = self.coco.getAnnIds(imgIds=[img_id])
+        # ann_ids = ["annotations":"id",满足"annotations":"image_id"==img_id]
+        ann_info = self.coco.loadAnns(ann_ids)
+        # ann_info = ["annotations"中的{},满足"annotations":"id"==ann_ids]
         return self._parse_ann_info(self.data_infos[idx], ann_info)
+        # dict(bboxes=,labels=,bboxes_ignore=,masks=,seg_map=)
 
     def get_cat_ids(self, idx):
         """Get COCO category ids by index.
@@ -80,12 +70,12 @@ class CocoDataset(CustomDataset):
         """
 
         img_id = self.data_infos[idx]['id']
-        ann_ids = self.coco.get_ann_ids(img_ids=[img_id])
-        ann_info = self.coco.load_anns(ann_ids)
-        return [ann['category_id'] for ann in ann_info]
+        ann_ids = self.coco.getAnnIds(imgIds=[img_id])
+        ann_info = self.coco.loadAnns(ann_ids)
+        return [ann['category_id'] for ann in ann_info]     # 元素为idx所对应的img中所包含的ann的category_id
 
     def _filter_imgs(self, min_size=32):
-        """Filter images too small or without ground truths."""
+        """Filter images too small or without ground truths.过滤太小或者没有GT的图像"""
         valid_inds = []
         ids_with_ann = set(_['image_id'] for _ in self.coco.anns.values())
         for i, img_info in enumerate(self.data_infos):
@@ -93,7 +83,7 @@ class CocoDataset(CustomDataset):
                 continue
             if min(img_info['width'], img_info['height']) >= min_size:
                 valid_inds.append(i)
-        return valid_inds
+        return valid_inds   # 元素为过滤后的图像所对应的在data_infos中下标所构成的list
 
     def get_subset_by_classes(self):
         """Get img ids that contain any category in class_ids.
@@ -115,7 +105,7 @@ class CocoDataset(CustomDataset):
 
         data_infos = []
         for i in self.img_ids:
-            info = self.coco.load_imgs([i])[0]
+            info = self.coco.loadImgs([i])[0]
             info['filename'] = info['file_name']
             data_infos.append(info)
         return data_infos
@@ -124,7 +114,8 @@ class CocoDataset(CustomDataset):
         """Parse bbox and mask annotation.
 
         Args:
-            ann_info (list[dict]): Annotation info of an image.
+            img_info (dict):"images"中的一项{}img信息
+            ann_info (list[dict]): Annotation info of an image.     [{},{],...]给定img里的ann信息
             with_mask (bool): Whether to parse mask annotations.
 
         Returns:
@@ -135,47 +126,79 @@ class CocoDataset(CustomDataset):
         gt_bboxes = []
         gt_labels = []
         gt_bboxes_ignore = []
+        ### 存储keypoints的list
+        gt_keypoints = []
+        gt_keypoints_ignore = []
+        ###
+
         gt_masks_ann = []
         for i, ann in enumerate(ann_info):
-            if ann.get('ignore', False):
+            if ann.get('ignore', False):    # 若字典中有'ignore',则跳过本次循环,在2017keypoints里没有ignore
                 continue
             x1, y1, w, h = ann['bbox']
-            inter_w = max(0, min(x1 + w, img_info['width']) - max(x1, 0))
+            inter_w = max(0, min(x1 + w, img_info['width']) - max(x1, 0))   # 处理以防止x2超出右边界和w为负的情况
             inter_h = max(0, min(y1 + h, img_info['height']) - max(y1, 0))
-            if inter_w * inter_h == 0:
+            if inter_w * inter_h == 0:  # w和h均为0,则通过本次循环
                 continue
-            if ann['area'] <= 0 or w < 1 or h < 1:
+            if ann['area'] <= 0 or w < 1 or h < 1:  # 标注面积过小
                 continue
-            if ann['category_id'] not in self.cat_ids:
+            if ann['category_id'] not in self.cat_ids:  # ann标注的class不在定义的CLASSES中
                 continue
             bbox = [x1, y1, x1 + w, y1 + h]
-            if ann.get('iscrowd', False):
-                gt_bboxes_ignore.append(bbox)
-            else:
-                gt_bboxes.append(bbox)
-                gt_labels.append(self.cat2label[ann['category_id']])
-                gt_masks_ann.append(ann['segmentation'])
 
+            ### 加载keypoints数据
+            keypoint=ann['keypoints']
+            ###
+
+            if ann.get('iscrowd', False):   # ann中iscrowd为1,既该ann为一组对象,则将该ann加入到ignore中
+                gt_bboxes_ignore.append(bbox)
+                ### 添加kp_ignore
+                gt_keypoints_ignore.append(keypoint)
+                ###
+            else:
+                gt_bboxes.append(bbox)      # [[],[],...,[]],由bbox构成的list
+                ### 添加kp
+                gt_keypoints.append(keypoint)
+                ###
+                gt_labels.append(self.cat2label[ann['category_id']])    # bbox对应的类别在cat_ids中的下标
+                gt_masks_ann.append(ann['segmentation'])    # [[],[],..,[]] 分隔
+        # 将list转换为array
         if gt_bboxes:
             gt_bboxes = np.array(gt_bboxes, dtype=np.float32)
             gt_labels = np.array(gt_labels, dtype=np.int64)
+            ### kp不为空.转换为array
+            gt_keypoints = np.array(gt_keypoints, dtype=np.float32)
+            ###
         else:
             gt_bboxes = np.zeros((0, 4), dtype=np.float32)
             gt_labels = np.array([], dtype=np.int64)
+            ### kp为空,生成array
+            gt_keypoints = np.zeros((0, 51), dtype=np.float32)
+            ###
 
         if gt_bboxes_ignore:
             gt_bboxes_ignore = np.array(gt_bboxes_ignore, dtype=np.float32)
+            ### kp_ignore不为空,转换为array
+            gt_keypoints_ignore = np.array(gt_keypoints_ignore, dtype=np.float32)
+            ###
         else:
             gt_bboxes_ignore = np.zeros((0, 4), dtype=np.float32)
+            ### kp_ignore为空,生成array
+            gt_keypoints_ignore = np.zeros((0, 51), dtype=np.float32)
+            ###
 
-        seg_map = img_info['filename'].replace('jpg', 'png')
+        seg_map = img_info['filename'].replace('jpg', 'png')    # 将filename中的jpg换为png
 
         ann = dict(
             bboxes=gt_bboxes,
+
+            keypoints=gt_keypoints,
+            keypoints_ignore=gt_keypoints_ignore,
+
             labels=gt_labels,
             bboxes_ignore=gt_bboxes_ignore,
             masks=gt_masks_ann,
-            seg_map=seg_map)
+            seg_map=seg_map)    # "images":"file_name"中的jpg换为png
 
         return ann
 
@@ -312,8 +335,8 @@ class CocoDataset(CustomDataset):
     def fast_eval_recall(self, results, proposal_nums, iou_thrs, logger=None):
         gt_bboxes = []
         for i in range(len(self.img_ids)):
-            ann_ids = self.coco.get_ann_ids(img_ids=self.img_ids[i])
-            ann_info = self.coco.load_anns(ann_ids)
+            ann_ids = self.coco.getAnnIds(imgIds=self.img_ids[i])
+            ann_info = self.coco.loadAnns(ann_ids)
             if len(ann_info) == 0:
                 gt_bboxes.append(np.zeros((0, 4)))
                 continue

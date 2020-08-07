@@ -232,9 +232,11 @@ class AnchorFreeHead(BaseDenseHead):
              cls_scores,
              bbox_preds,
              gt_bboxes,
+             gt_keypoints,
              gt_labels,
              img_metas,
-             gt_bboxes_ignore=None):
+             gt_bboxes_ignore=None,
+             gt_keypoints_ignore=None):
         """Compute loss of the head.
 
         Args:

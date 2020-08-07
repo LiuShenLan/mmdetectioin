@@ -52,20 +52,20 @@ class Resize(object):
     """
 
     def __init__(self,
-                 img_scale=None,
+                 img_scale=None,    # train:img_scale=(1333, 800)
                  multiscale_mode='range',
                  ratio_range=None,
                  keep_ratio=True):
-        if img_scale is None:
+        if img_scale is None:   # False
             self.img_scale = None
         else:
             if isinstance(img_scale, list):
                 self.img_scale = img_scale
             else:
-                self.img_scale = [img_scale]
+                self.img_scale = [img_scale]    # train:img_scale=[(1333, 800)]
             assert mmcv.is_list_of(self.img_scale, tuple)
 
-        if ratio_range is not None:
+        if ratio_range is not None: # False
             # mode 1: given a scale and a range of image ratio
             assert len(self.img_scale) == 1
         else:
@@ -166,10 +166,11 @@ class Resize(object):
                 ``results``, which would be used by subsequent pipelines.
         """
 
-        if self.ratio_range is not None:
+        # img_scale=[(1333, 800)]
+        if self.ratio_range is not None:    # False
             scale, scale_idx = self.random_sample_ratio(
                 self.img_scale[0], self.ratio_range)
-        elif len(self.img_scale) == 1:
+        elif len(self.img_scale) == 1:      # True
             scale, scale_idx = self.img_scale[0], 0
         elif self.multiscale_mode == 'range':
             scale, scale_idx = self.random_sample(self.img_scale)
@@ -178,8 +179,8 @@ class Resize(object):
         else:
             raise NotImplementedError
 
-        results['scale'] = scale
-        results['scale_idx'] = scale_idx
+        results['scale'] = scale    # (1333, 800)
+        results['scale_idx'] = scale_idx    # 0
 
     def _resize_img(self, results):
         """Resize images with ``results['scale']``."""
@@ -207,13 +208,26 @@ class Resize(object):
             results['keep_ratio'] = self.keep_ratio
 
     def _resize_bboxes(self, results):
-        """Resize bounding boxes with ``results['scale_factor']``."""
-        img_shape = results['img_shape']
+        """Resize bounding boxes with ``results['scale_factor']``.
+        results['gt_bboxes']为二维向量,[num][x1,y1,x2,y2]
+        results['gt_keypoints']为二维向量,[num][x1,y1,x2,y2]
+        """
+        img_shape = results['img_shape']    # h,w
         for key in results.get('bbox_fields', []):
             bboxes = results[key] * results['scale_factor']
             bboxes[:, 0::2] = np.clip(bboxes[:, 0::2], 0, img_shape[1])
             bboxes[:, 1::2] = np.clip(bboxes[:, 1::2], 0, img_shape[0])
             results[key] = bboxes
+        
+        ###
+        for key in results.get('keypoint_fields', []):
+            scale_factor_array = np.append(results['scale_factor'][:2],1)
+            scale_factor_array = np.tile(scale_factor_array,17)
+            keypoints = results[key] * scale_factor_array
+            keypoints[:, 0::3] = np.clip(keypoints[:, 0::3], 0, img_shape[1])
+            keypoints[:, 1::3] = np.clip(keypoints[:, 1::3], 0, img_shape[0])
+            results[key] = keypoints
+        ###
 
     def _resize_masks(self, results):
         """Resize masks with ``results['scale']``"""
@@ -242,14 +256,41 @@ class Resize(object):
 
         Args:
             results (dict): Result dict from loading pipeline.
-
+        {
+            'img_info': {
+                'license': 3, 
+                'file_name': '000000391895.jpg', 
+                'coco_url': 'http://images.cocodataset.org/train2017/000000391895.jpg', 
+                'height': 360, 
+                'width': 640, 
+                'date_captured': '2013-11-14 11:18:45', 
+                'flickr_url': 'http://farm9.staticflickr.com/8186/8119368305_4e622c8349_z.jpg', 
+                'id': 391895, 
+                'filename': '000000391895.jpg'}, 
+            'ann_info': {
+                'bboxes': array([[339.88,  22.16, 493.76, 322.89], [471.64, 172.82, 507.56, 220.92]], dtype=float32), 
+                'keypoints': array([[368.,...], [  0.,...]], dtype=float32), 	# (2,51)
+                'keypoints_ignore': array([], shape=(0, 51), dtype=float32), 
+                'labels': array([0, 0]), 
+                'bboxes_ignore': array([], shape=(0, 4), dtype=float32), 
+                'masks': [[[352.55]]], 
+                'seg_map': '000000391895.png'}, 
+            'img_prefix': [], 'seg_prefix': [], 'proposal_file': [], 'mask_fields': [], 'seg_fields': [], 
+            'bbox_fields': ['gt_bboxes_ignore', 'gt_bboxes'], 
+            'gt_bboxes': array([[339.88,  22.16, 493.76, 322.89], [471.64, 172.82, 507.56, 220.92]], dtype=float32), 
+            'gt_bboxes_ignore': array([], shape=(0, 4), dtype=float32), 
+            
+            'keypoint_fields': ['gt_keypoints_ignore', 'gt_keypoints'], 
+            'gt_keypoints': array([[368.,...], [  0.,...]], dtype=float32), 	# (2,51)
+            'gt_keypoints_ignore': array([], shape=(0, 51), dtype=float32)}
+        
         Returns:
             dict: Resized results, 'img_shape', 'pad_shape', 'scale_factor', \
                 'keep_ratio' keys are added into result dict.
         """
 
-        if 'scale' not in results:
-            if 'scale_factor' in results:
+        if 'scale' not in results:  # True
+            if 'scale_factor' in results:   # False
                 img_shape = results['img'].shape[:2]
                 scale_factor = results['scale_factor']
                 assert isinstance(scale_factor, float)
@@ -260,7 +301,8 @@ class Resize(object):
         else:
             assert 'scale_factor' not in results, (
                 'scale and scale_factor cannot be both set.')
-
+        # results['scale'] = (1333, 800)
+        # results['scale_idx'] = 0
         self._resize_img(results)
         self._resize_bboxes(results)
         self._resize_masks(results)
@@ -291,8 +333,8 @@ class RandomFlip(object):
     """
 
     def __init__(self, flip_ratio=None, direction='horizontal'):
-        self.flip_ratio = flip_ratio
-        self.direction = direction
+        self.flip_ratio = flip_ratio    # 0.5
+        self.direction = direction      # horizontal,水平
         if flip_ratio is not None:
             assert flip_ratio >= 0 and flip_ratio <= 1
         assert direction in ['horizontal', 'vertical']
@@ -324,6 +366,31 @@ class RandomFlip(object):
             raise ValueError(f"Invalid flipping direction '{direction}'")
         return flipped
 
+    def keypoint_flip(self, keypoints, img_shape, direction):
+        """Flip keypoints horizontally.
+
+        Args:
+            keypoints (numpy.ndarray): Bounding boxes, shape (..., 3*k)
+            img_shape (tuple[int]): Image shape (height, width)
+            direction (str): Flip direction. Options are 'horizontal',
+                'vertical'.
+
+        Returns:
+            numpy.ndarray: Flipped keypoints.
+        """
+
+        assert keypoints.shape[-1] % 51 == 0
+        flipped = keypoints.copy()
+        if direction == 'horizontal':
+            w = img_shape[1]
+            flipped[..., 0::3] = w - keypoints[..., 0::3]
+        elif direction == 'vertical':
+            h = img_shape[0]
+            flipped[..., 1::3] = h - keypoints[..., 1::3]
+        else:
+            raise ValueError(f"Invalid flipping direction '{direction}'")
+        return flipped
+
     def __call__(self, results):
         """Call function to flip bounding boxes, masks, semantic segmentation
         maps.
@@ -351,6 +418,12 @@ class RandomFlip(object):
                 results[key] = self.bbox_flip(results[key],
                                               results['img_shape'],
                                               results['flip_direction'])
+            ### flip keypoints
+            for key in results.get('keypoint_fields', []):
+                results[key] = self.keypoint_flip(results[key],
+                                                  results['img_shape'],
+                                                  results['flip_direction'])
+            ###
             # flip masks
             for key in results.get('mask_fields', []):
                 results[key] = results[key].flip(results['flip_direction'])

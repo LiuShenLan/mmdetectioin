@@ -7,8 +7,8 @@ from .builder import ANCHOR_GENERATORS
 class PointGenerator(object):
 
     def _meshgrid(self, x, y, row_major=True):
-        xx = x.repeat(len(y))
-        yy = y.view(-1, 1).repeat(1, len(x)).view(-1)
+        xx = x.repeat(len(y))   # [0,s,2s,...,0,s,2s,...]
+        yy = y.view(-1, 1).repeat(1, len(x)).view(-1)   # [0,0,...,s,s,...,2s,2s,...]
         if row_major:
             return xx, yy
         else:
@@ -19,8 +19,8 @@ class PointGenerator(object):
         shift_x = torch.arange(0., feat_w, device=device) * stride
         shift_y = torch.arange(0., feat_h, device=device) * stride
         shift_xx, shift_yy = self._meshgrid(shift_x, shift_y)
-        stride = shift_x.new_full((shift_xx.shape[0], ), stride)
-        shifts = torch.stack([shift_xx, shift_yy, stride], dim=-1)
+        stride = shift_x.new_full((shift_xx.shape[0], ), stride)    # 与xx相同维度的由s组成的一维张量
+        shifts = torch.stack([shift_xx, shift_yy, stride], dim=-1)  # [h*w,3],先遍历x再遍历y
         all_points = shifts.to(device)
         return all_points
 

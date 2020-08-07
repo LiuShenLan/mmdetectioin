@@ -30,8 +30,8 @@ class RepPointsHead(AnchorFreeHead):
     """  # noqa: W605
 
     def __init__(self,
-                 num_classes,
-                 in_channels,
+                 num_classes,   # 1
+                 in_channels,   # 256
                  point_feat_channels=256,
                  num_points=9,
                  gradient_mul=0.1,
@@ -52,57 +52,62 @@ class RepPointsHead(AnchorFreeHead):
                  transform_method='moment',
                  moment_mul=0.01,
                  **kwargs):
-        self.num_points = num_points
-        self.point_feat_channels = point_feat_channels
-        self.use_grid_points = use_grid_points
-        self.center_init = center_init
+        self.num_points = num_points    # 9
+        self.point_feat_channels = point_feat_channels  # 256
+        self.use_grid_points = use_grid_points  # Fasle
+        self.center_init = center_init  # True
 
         # we use deform conv to extract points features
-        self.dcn_kernel = int(np.sqrt(num_points))
-        self.dcn_pad = int((self.dcn_kernel - 1) / 2)
+        self.dcn_kernel = int(np.sqrt(num_points))      # 3
+        self.dcn_pad = int((self.dcn_kernel - 1) / 2)   # 1
         assert self.dcn_kernel * self.dcn_kernel == num_points, \
             'The points number should be a square number.'
         assert self.dcn_kernel % 2 == 1, \
             'The points number should be an odd square number.'
-        dcn_base = np.arange(-self.dcn_pad,
+        dcn_base = np.arange(-self.dcn_pad,             # [-1, 0, 1]
                              self.dcn_pad + 1).astype(np.float64)
-        dcn_base_y = np.repeat(dcn_base, self.dcn_kernel)
-        dcn_base_x = np.tile(dcn_base, self.dcn_kernel)
+        dcn_base_y = np.repeat(dcn_base, self.dcn_kernel)   # [-1,-1,-1, 0, 0, 0, 1, 1, 1]
+        dcn_base_x = np.tile(dcn_base, self.dcn_kernel)     # [-1, 0, 1,-1, 0, 1,-1, 0, 1]
         dcn_base_offset = np.stack([dcn_base_y, dcn_base_x], axis=1).reshape(
-            (-1))
-        self.dcn_base_offset = torch.tensor(dcn_base_offset).view(1, -1, 1, 1)
+            (-1))   # [-1, -1, -1, 0, -1, 1, 0, -1, 0, 0, 0, 1, 1, -1, 1, 0, 1, 1]
+        self.dcn_base_offset = torch.tensor(dcn_base_offset).view(1, -1, 1, 1)  # torch.Size([1, 18, 1, 1])
 
         super().__init__(num_classes, in_channels, loss_cls=loss_cls, **kwargs)
 
-        self.gradient_mul = gradient_mul
-        self.point_base_scale = point_base_scale
-        self.point_strides = point_strides
+        self.gradient_mul = gradient_mul    # 0.1
+        self.point_base_scale = point_base_scale    # 4
+        self.point_strides = point_strides  # [8, 16, 32, 64, 128]
         self.point_generators = [PointGenerator() for _ in self.point_strides]
 
-        self.sampling = loss_cls['type'] not in ['FocalLoss']
+        self.sampling = loss_cls['type'] not in ['FocalLoss']   # False
         if self.train_cfg:
             self.init_assigner = build_assigner(self.train_cfg.init.assigner)
+            # assigner=dict(type='PointAssigner', scale=4, pos_num=1)
             self.refine_assigner = build_assigner(
                 self.train_cfg.refine.assigner)
+            # assigner=dict(type='MaxIoUAssigner',pos_iou_thr=0.5,neg_iou_thr=0.4,min_pos_iou=0,ignore_iof_thr=-1)
+
             # use PseudoSampler when sampling is False
-            if self.sampling and hasattr(self.train_cfg, 'sampler'):
+            if self.sampling and hasattr(self.train_cfg, 'sampler'):    # False
                 sampler_cfg = self.train_cfg.sampler
             else:
                 sampler_cfg = dict(type='PseudoSampler')
             self.sampler = build_sampler(sampler_cfg, context=self)
         self.transform_method = transform_method
-        if self.transform_method == 'moment':
+        if self.transform_method == 'moment':   # True
             self.moment_transfer = nn.Parameter(
                 data=torch.zeros(2), requires_grad=True)
             self.moment_mul = moment_mul
 
-        self.use_sigmoid_cls = loss_cls.get('use_sigmoid', False)
-        if self.use_sigmoid_cls:
-            self.cls_out_channels = self.num_classes
+        self.use_sigmoid_cls = loss_cls.get('use_sigmoid', False)   # True
+        if self.use_sigmoid_cls:    # True
+            self.cls_out_channels = self.num_classes    # 1
         else:
             self.cls_out_channels = self.num_classes + 1
         self.loss_bbox_init = build_loss(loss_bbox_init)
+        # loss_bbox_init=dict(type='SmoothL1Loss', beta=0.11, loss_weight=0.5),
         self.loss_bbox_refine = build_loss(loss_bbox_refine)
+        # loss_bbox_refine=dict(type='SmoothL1Loss', beta=0.11, loss_weight=1.0),
 
     def _init_layers(self):
         """Initialize layers of the head."""
@@ -296,14 +301,15 @@ class RepPointsHead(AnchorFreeHead):
         """Get points according to feature map sizes.
 
         Args:
-            featmap_sizes (list[tuple]): Multi-level feature map sizes.
+            featmap_sizes (list[tuple]): Multi-level feature map sizes.每张图片的h和w是不同的,下一行为例子
+                    [torch.Size([100, 152]),  [50, 76], [25, 38], [13, 19], [7, 10])]
             img_metas (list[dict]): Image meta info.
 
         Returns:
             tuple: points of each image, valid flags of each image
         """
         num_imgs = len(img_metas)
-        num_levels = len(featmap_sizes)
+        num_levels = len(featmap_sizes) # 5
 
         # since feature map sizes of all images are the same, we only compute
         # points center for one time
@@ -312,8 +318,8 @@ class RepPointsHead(AnchorFreeHead):
             points = self.point_generators[i].grid_points(
                 featmap_sizes[i], self.point_strides[i])
             multi_level_points.append(points)
-        points_list = [[point.clone() for point in multi_level_points]
-                       for _ in range(num_imgs)]
+        points_list = [[point.clone() for point in multi_level_points]  # [num_imgs,num_levels,h*w,3]
+                       for _ in range(num_imgs)]                        # [x,y,s]   x先变化
 
         # for each image, we compute valid flags of multi level grids
         valid_flag_list = []
@@ -323,12 +329,12 @@ class RepPointsHead(AnchorFreeHead):
                 point_stride = self.point_strides[i]
                 feat_h, feat_w = featmap_sizes[i]
                 h, w = img_meta['pad_shape'][:2]
-                valid_feat_h = min(int(np.ceil(h / point_stride)), feat_h)
-                valid_feat_w = min(int(np.ceil(w / point_stride)), feat_w)
+                valid_feat_h = min(int(np.ceil(h / point_stride)), feat_h)  # 计算h/s和feat_h的较小值
+                valid_feat_w = min(int(np.ceil(w / point_stride)), feat_w)  # 原始图片大小/s和feat_大小
                 flags = self.point_generators[i].valid_flags(
                     (feat_h, feat_w), (valid_feat_h, valid_feat_w))
                 multi_level_flags.append(flags)
-            valid_flag_list.append(multi_level_flags)
+            valid_flag_list.append(multi_level_flags)   # [num_imgs,num_levels,h*w]
 
         return points_list, valid_flag_list
 
@@ -351,25 +357,31 @@ class RepPointsHead(AnchorFreeHead):
         return bbox_list
 
     def offset_to_pts(self, center_list, pred_list):
-        """Change from point offset to point coordinate."""
+        """Change from point offset to point coordinate.
+
+        Args:
+            center_list (list[tensor]): [num_imgs,num_levels,h*w,3]
+            pred_list (list[tensor]):   [num_level,num_img,18,h,w]
+        """
         pts_list = []
-        for i_lvl in range(len(self.point_strides)):
+        for i_lvl in range(len(self.point_strides)):    # 对level遍历
             pts_lvl = []
-            for i_img in range(len(center_list)):
+            for i_img in range(len(center_list)):   # 对img遍历
                 pts_center = center_list[i_img][i_lvl][:, :2].repeat(
-                    1, self.num_points)
-                pts_shift = pred_list[i_lvl][i_img]
+                    1, self.num_points)         # [h*w,18]  中心点坐标
+                pts_shift = pred_list[i_lvl][i_img] # [18,h,w]  预测偏差
                 yx_pts_shift = pts_shift.permute(1, 2, 0).view(
-                    -1, 2 * self.num_points)
-                y_pts_shift = yx_pts_shift[..., 0::2]
-                x_pts_shift = yx_pts_shift[..., 1::2]
+                    -1, 2 * self.num_points)    # [h*w,18]  预测偏差
+                y_pts_shift = yx_pts_shift[..., 0::2]   # [h*w,9]   y坐标偏差
+                x_pts_shift = yx_pts_shift[..., 1::2]   # [h*w,9]   x坐标偏差
                 xy_pts_shift = torch.stack([x_pts_shift, y_pts_shift], -1)
-                xy_pts_shift = xy_pts_shift.view(*yx_pts_shift.shape[:-1], -1)
-                pts = xy_pts_shift * self.point_strides[i_lvl] + pts_center
+                xy_pts_shift = xy_pts_shift.view(*yx_pts_shift.shape[:-1], -1)  # [h*w,18]
+                pts = xy_pts_shift * self.point_strides[i_lvl] + pts_center     # [h*w,18]  reppoints点坐标
                 pts_lvl.append(pts)
             pts_lvl = torch.stack(pts_lvl, 0)
             pts_list.append(pts_lvl)
-        return pts_list
+
+        return pts_list # [num_img,h*w,18]  reppoints点坐标
 
     def _point_target_single(self,
                              flat_proposals,
@@ -442,12 +454,12 @@ class RepPointsHead(AnchorFreeHead):
                 proposals_weights, pos_inds, neg_inds)
 
     def get_targets(self,
-                    proposals_list,
-                    valid_flag_list,
-                    gt_bboxes_list,
+                    proposals_list,     # center_list: [num_imgs,num_levels,h*w,3]
+                    valid_flag_list,    # [num_imgs,num_levels,h*w]
+                    gt_bboxes_list,     # [torch.Size([1, 4])]
                     img_metas,
                     gt_bboxes_ignore_list=None,
-                    gt_labels_list=None,
+                    gt_labels_list=None,# [tensor([0], device='cuda:0')]
                     stage='init',
                     label_channels=1,
                     unmap_outputs=True):
@@ -485,7 +497,7 @@ class RepPointsHead(AnchorFreeHead):
         assert len(proposals_list) == len(valid_flag_list) == num_imgs
 
         # points number of multi levels
-        num_level_proposals = [points.size(0) for points in proposals_list[0]]
+        num_level_proposals = [points.size(0) for points in proposals_list[0]]  # [num_level,h*w]
 
         # concat all level points and flags to a single tensor
         for i in range(num_imgs):
@@ -563,23 +575,28 @@ class RepPointsHead(AnchorFreeHead):
         return loss_cls, loss_pts_init, loss_pts_refine
 
     def loss(self,
-             cls_scores,
-             pts_preds_init,
-             pts_preds_refine,
-             gt_bboxes,
-             gt_labels,
+             cls_scores,        # [num_level,num_img,1,h,w]   5个元素组成的list,每个元素为tensor [num_img,1,h,w],
+             pts_preds_init,    # [num_level,num_img,18,h,w]  每张图片的h与w不同,举例为[100,148],[50,74],[25,37],[13,19],[7,10]
+             pts_preds_refine,  # [num_level,num_img,18,h,w]
+             gt_bboxes,         # [torch.Size([1, 4])]
+             gt_keypoints,      # [torch.Size([1, 51])]
+             gt_labels,         # [tensor([0], device='cuda:0')]
              img_metas,
-             gt_bboxes_ignore=None):
+             gt_bboxes_ignore=None,
+             gt_keypoints_ignore=None):
         featmap_sizes = [featmap.size()[-2:] for featmap in cls_scores]
+        # 不同图片的featmap_sizes不同,举例为[torch.Size([100, 148]), [50, 74], [25, 37], [13, 19], [7, 10])]
         assert len(featmap_sizes) == len(self.point_generators)
-        label_channels = self.cls_out_channels if self.use_sigmoid_cls else 1
+        label_channels = self.cls_out_channels if self.use_sigmoid_cls else 1   # 1
 
         # target for initial stage
         center_list, valid_flag_list = self.get_points(featmap_sizes,
                                                        img_metas)
+        # center_list: [num_imgs,num_levels,h*w,3]  valid_flag_list:[num_imgs,num_levels,h*w]
         pts_coordinate_preds_init = self.offset_to_pts(center_list,
                                                        pts_preds_init)
-        if self.train_cfg.init.assigner['type'] == 'PointAssigner':
+        # pts_coordinate_preds_init: [num_img,h*w,18]  reppoints点坐标
+        if self.train_cfg.init.assigner['type'] == 'PointAssigner': # True
             # Assign target for center list
             candidate_list = center_list
         else:

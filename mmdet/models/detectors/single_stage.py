@@ -68,8 +68,10 @@ class SingleStageDetector(BaseDetector):
                       img,
                       img_metas,
                       gt_bboxes,
+                      gt_keypoints,
                       gt_labels,
-                      gt_bboxes_ignore=None):
+                      gt_bboxes_ignore=None,
+                      gt_keypoints_ignore=None):
         """
         Args:
             img (Tensor): Input images of shape (N, C, H, W).
@@ -89,8 +91,8 @@ class SingleStageDetector(BaseDetector):
             dict[str, Tensor]: A dictionary of loss components.
         """
         x = self.extract_feat(img)
-        losses = self.bbox_head.forward_train(x, img_metas, gt_bboxes,
-                                              gt_labels, gt_bboxes_ignore)
+        losses = self.bbox_head.forward_train(x, img_metas, gt_bboxes,gt_keypoints,
+                                              gt_labels, gt_bboxes_ignore, gt_keypoints_ignore)
         return losses
 
     def simple_test(self, img, img_metas, rescale=False):

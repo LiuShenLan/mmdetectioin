@@ -65,7 +65,9 @@ class RPN(BaseDetector):
                       img,
                       img_metas,
                       gt_bboxes=None,
-                      gt_bboxes_ignore=None):
+                      gt_keypoints=None,
+                      gt_bboxes_ignore=None,
+                      gt_keypoints_ignore=None):
         """
         Args:
             img (Tensor): Input images of shape (N, C, H, W).

@@ -206,6 +206,7 @@ class LoadAnnotations(object):
         """
 
         ann_info = results['ann_info']
+
         results['gt_bboxes'] = ann_info['bboxes'].copy()
 
         gt_bboxes_ignore = ann_info.get('bboxes_ignore', None)
@@ -213,7 +214,43 @@ class LoadAnnotations(object):
             results['gt_bboxes_ignore'] = gt_bboxes_ignore.copy()
             results['bbox_fields'].append('gt_bboxes_ignore')
         results['bbox_fields'].append('gt_bboxes')
+
+        ###
+        results['gt_keypoints'] = ann_info['keypoints'].copy()
+
+        gt_keypoints_ignore = ann_info.get('keypoints_ignore', None)
+        if gt_keypoints_ignore is not None:
+            results['gt_keypoints_ignore'] = gt_keypoints_ignore.copy()
+            results['keypoint_fields'].append('gt_keypoints_ignore')
+        results['keypoint_fields'].append('gt_keypoints')
+        ###
         return results
+        """
+        {'img_info': {
+            'license': 3, 
+            'file_name': '000000391895.jpg', 
+            'coco_url': 'http://images.cocodataset.org/train2017/000000391895.jpg', 
+            'height': 360, 
+            'width': 640, 
+            'date_captured': '2013-11-14 11:18:45', 
+            'flickr_url': 'http://farm9.staticflickr.com/8186/8119368305_4e622c8349_z.jpg', 
+            'id': 391895, 
+            'filename': '000000391895.jpg'}, 
+        'ann_info': {
+            'bboxes': array([[339.88,  22.16, 493.76, 322.89], [471.64, 172.82, 507.56, 220.92]], dtype=float32), 
+            'keypoints': array([[368.,...], [  0.,...]], dtype=float32),	# (2,51)
+            'keypoints_ignore': array([], shape=(0, 51), dtype=float32), 
+            'labels': array([0, 0]), 
+            'bboxes_ignore': array([], shape=(0, 4), dtype=float32), 
+            'masks': [[[352.55, ...]]], 
+            'seg_map': '000000391895.png'}, 
+        'img_prefix': [], 'seg_prefix': [], 'proposal_file': [], 'mask_fields': [], 'seg_fields': [], 
+        'bbox_fields': ['gt_bboxes'], 
+        'gt_bboxes': array([[339.88,  22.16, 493.76, 322.89], [471.64, 172.82, 507.56, 220.92]], dtype=float32), 
+        'keypoint_fields': ['gt_keypoints_ignore', 'gt_keypoints'], 
+        'gt_keypoints': array([[368.,...], [  0.,...]], dtype=float32), 	# (2,51)
+        'gt_keypoints_ignore': array([], shape=(0, 51), dtype=float32)}
+        """
 
     def _load_labels(self, results):
         """Private function to load label annotations.
@@ -323,21 +360,39 @@ class LoadAnnotations(object):
 
         Args:
             results (dict): Result dict from :obj:`mmdet.CustomDataset`.
-
+            {
+                'img_info': {
+                    'license': 3, 
+                    'file_name': '000000391895.jpg', 
+                    'coco_url': 'http://images.cocodataset.org/train2017/000000391895.jpg', 
+                    'height': 360, 'width': 640, 'date_captured': '2013-11-14 11:18:45', 
+                    'flickr_url': 'http://farm9.staticflickr.com/8186/8119368305_4e622c8349_z.jpg', 
+                    'id': 391895, 
+                    'filename': '000000391895.jpg'}, 
+                'ann_info': {
+                    'bboxes': array([[339.88,  22.16, 493.76, 322.89], [471.64, 172.82, 507.56, 220.92]], dtype=float32), 
+                    'keypoints': array([[368.,  61.,   1.,...],[  0.,   0.,   0.,...]], dtype=float32), # [2,51]
+                    'keypoints_ignore': array([], shape=(0, 51), dtype=float32), 
+                    'labels': array([0, 0]), 
+                    'bboxes_ignore': array([], shape=(0, 4), dtype=float32), 
+                    'masks': [[[352.55, ...]]], 
+                    'seg_map': '000000391895.png'}, 
+                'img_prefix': [], 'seg_prefix': [], 'proposal_file': [], 'bbox_fields': [], 'keypoint_fields': [], 'mask_fields': [],'seg_fields': []}
         Returns:
             dict: The dict contains loaded bounding box, label, mask and
                 semantic segmentation annotations.
         """
 
-        if self.with_bbox:
+        if self.with_bbox:      # default=True
             results = self._load_bboxes(results)
             if results is None:
                 return None
-        if self.with_label:
+        if self.with_label:     # default=True
             results = self._load_labels(results)
-        if self.with_mask:
+            # results['gt_labels'] = results['ann_info']['labels'].copy()
+        if self.with_mask:      # default=False
             results = self._load_masks(results)
-        if self.with_seg:
+        if self.with_seg:       # default=False
             results = self._load_semantic_seg(results)
         return results
 
