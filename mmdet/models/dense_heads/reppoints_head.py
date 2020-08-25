@@ -384,19 +384,19 @@ class RepPointsHead(AnchorFreeHead):
         return pts_list # [num_img,h*w,18]  reppoints点坐标
 
     def _point_target_single(self,
-                             flat_proposals,
-                             valid_flags,
-                             gt_bboxes,
+                             flat_proposals,    # init:[num_img,all_h*w,3]
+                             valid_flags,       # [num_img,all_h*w]
+                             gt_bboxes,         # [torch.Size([1, 4])]
                              gt_bboxes_ignore,
-                             gt_labels,
-                             label_channels=1,
+                             gt_labels,         # [tensor([0], device='cuda:0')]
+                             label_channels=1,  # 1
                              stage='init',
-                             unmap_outputs=True):
+                             unmap_outputs=True):# True
         inside_flags = valid_flags
         if not inside_flags.any():
             return (None, ) * 7
         # assign gt and sample proposals
-        proposals = flat_proposals[inside_flags, :]
+        proposals = flat_proposals[inside_flags, :] # [all_h*w,3]
 
         if stage == 'init':
             assigner = self.init_assigner
@@ -409,21 +409,22 @@ class RepPointsHead(AnchorFreeHead):
         sampling_result = self.sampler.sample(assign_result, proposals,
                                               gt_bboxes)
 
-        num_valid_proposals = proposals.shape[0]
-        bbox_gt = proposals.new_zeros([num_valid_proposals, 4])
-        pos_proposals = torch.zeros_like(proposals)
-        proposals_weights = proposals.new_zeros([num_valid_proposals, 4])
-        labels = proposals.new_full((num_valid_proposals, ),
+        num_valid_proposals = proposals.shape[0]    # all_h*w
+        bbox_gt = proposals.new_zeros([num_valid_proposals, 4]) # [all_h*w,4]
+        pos_proposals = torch.zeros_like(proposals) # [all_h*w,3]
+        proposals_weights = proposals.new_zeros([num_valid_proposals, 4])   # [all_h*w,4]
+        labels = proposals.new_full((num_valid_proposals, ),    # [all_h*w]
                                     self.background_label,
                                     dtype=torch.long)
-        label_weights = proposals.new_zeros(
+        label_weights = proposals.new_zeros(        # [all_h*w]
             num_valid_proposals, dtype=torch.float)
 
-        pos_inds = sampling_result.pos_inds
-        neg_inds = sampling_result.neg_inds
+        pos_inds = sampling_result.pos_inds     # positive_index    tensor[pos_num]
+        neg_inds = sampling_result.neg_inds     # negative_index    tensor[neg_num]
         if len(pos_inds) > 0:
-            pos_gt_bboxes = sampling_result.pos_gt_bboxes
+            pos_gt_bboxes = sampling_result.pos_gt_bboxes   # tensor[n,4]
             bbox_gt[pos_inds, :] = pos_gt_bboxes
+            print(bbox_gt.shape)
             pos_proposals[pos_inds, :] = proposals[pos_inds, :]
             proposals_weights[pos_inds, :] = 1.0
             if gt_labels is None:
@@ -454,15 +455,15 @@ class RepPointsHead(AnchorFreeHead):
                 proposals_weights, pos_inds, neg_inds)
 
     def get_targets(self,
-                    proposals_list,     # center_list: [num_imgs,num_levels,h*w,3]
+                    proposals_list,     # init:[num_imgs,num_levels,h*w,3]
                     valid_flag_list,    # [num_imgs,num_levels,h*w]
                     gt_bboxes_list,     # [torch.Size([1, 4])]
                     img_metas,
                     gt_bboxes_ignore_list=None,
                     gt_labels_list=None,# [tensor([0], device='cuda:0')]
                     stage='init',
-                    label_channels=1,
-                    unmap_outputs=True):
+                    label_channels=1,   # 1
+                    unmap_outputs=True):# True
         """Compute corresponding GT box and classification targets for
         proposals.
 
@@ -497,13 +498,16 @@ class RepPointsHead(AnchorFreeHead):
         assert len(proposals_list) == len(valid_flag_list) == num_imgs
 
         # points number of multi levels
-        num_level_proposals = [points.size(0) for points in proposals_list[0]]  # [num_level,h*w]
+        num_level_proposals = [points.size(0) for points in proposals_list[0]]
+        # [num_level] 其中每个元素为相应层的h*w
 
         # concat all level points and flags to a single tensor
         for i in range(num_imgs):
             assert len(proposals_list[i]) == len(valid_flag_list[i])
-            proposals_list[i] = torch.cat(proposals_list[i])
-            valid_flag_list[i] = torch.cat(valid_flag_list[i])
+            # p[i]和v[i]输入时为由num_level个元素组成的list,每个元素分别为[h*w,3]和[h*w]的tensor
+            proposals_list[i] = torch.cat(proposals_list[i])    # [num_img,all_h*w,3]
+            valid_flag_list[i] = torch.cat(valid_flag_list[i])  # [num_img,all_h*w]
+            # 输出时,p[i]和v[i]为将所有的level叠加在一起的[(all level)h*w,3]和[(all level)h*w]的tensor
 
         # compute targets for each image
         if gt_bboxes_ignore_list is None:
@@ -586,7 +590,7 @@ class RepPointsHead(AnchorFreeHead):
              gt_keypoints_ignore=None):
         featmap_sizes = [featmap.size()[-2:] for featmap in cls_scores]
         # 不同图片的featmap_sizes不同,举例为[torch.Size([100, 148]), [50, 74], [25, 37], [13, 19], [7, 10])]
-        assert len(featmap_sizes) == len(self.point_generators)
+        assert len(featmap_sizes) == len(self.point_generators) # num_level
         label_channels = self.cls_out_channels if self.use_sigmoid_cls else 1   # 1
 
         # target for initial stage
