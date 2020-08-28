@@ -24,16 +24,21 @@ class SamplingResult(util_mixins.NiceRepr):
 
     def __init__(self, pos_inds, neg_inds, bboxes, gt_bboxes, assign_result,
                  gt_flags):
-        self.pos_inds = pos_inds
-        self.neg_inds = neg_inds
-        self.pos_bboxes = bboxes[pos_inds]
+        # bboxes:init:proposal[all_h*w,3]
+        # gt_bboxes:[torch.Size([k, 4])]
+        # assign_result:assign_result
+        # gt_flags:[all_h*w] 全零
+        self.pos_inds = pos_inds    # [k] 每个元素为bbox的index
+        self.neg_inds = neg_inds    # [all_h*w-k] 每个元素为range(all_h*w),去掉bbox的index
+        self.pos_bboxes = bboxes[pos_inds]  # [k] 取bbox的相应元素
         self.neg_bboxes = bboxes[neg_inds]
         self.pos_is_gt = gt_flags[pos_inds]
 
-        self.num_gts = gt_bboxes.shape[0]
+        self.num_gts = gt_bboxes.shape[0]   # ==k
         self.pos_assigned_gt_inds = assign_result.gt_inds[pos_inds] - 1
+        # [allh*w],背景为-1,bbox中心点为bbox_index(既从0到k-1)
 
-        if gt_bboxes.numel() == 0:
+        if gt_bboxes.numel() == 0:  # gt_bboxes的元素数目为0
             # hack for index error case
             assert self.pos_assigned_gt_inds.numel() == 0
             self.pos_gt_bboxes = torch.empty_like(gt_bboxes).view(-1, 4)
@@ -42,9 +47,10 @@ class SamplingResult(util_mixins.NiceRepr):
                 gt_bboxes = gt_bboxes.view(-1, 4)
 
             self.pos_gt_bboxes = gt_bboxes[self.pos_assigned_gt_inds, :]
+            # 将gt_bboxes按照pos_assigned_gt_inds的顺序排列
 
         if assign_result.labels is not None:
-            self.pos_gt_labels = assign_result.labels[pos_inds]
+            self.pos_gt_labels = assign_result.labels[pos_inds] # [k] 每个元素为bbox的label
         else:
             self.pos_gt_labels = None
 

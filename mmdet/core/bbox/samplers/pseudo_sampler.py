@@ -31,11 +31,12 @@ class PseudoSampler(BaseSampler):
         Returns:
             :obj:`SamplingResult`: sampler results
         """
-        pos_inds = torch.nonzero(
+        pos_inds = torch.nonzero(   # [k] 每个元素为bbox的index
             assign_result.gt_inds > 0, as_tuple=False).squeeze(-1).unique()
-        neg_inds = torch.nonzero(
+        # assign_result.gt_inds:[allh*w],背景为0,bbox中心点为bbox_index(既从1到k)
+        neg_inds = torch.nonzero(   # [all_h*w-k] 每个元素为range(all_h*w),去掉bbox的index
             assign_result.gt_inds == 0, as_tuple=False).squeeze(-1).unique()
-        gt_flags = bboxes.new_zeros(bboxes.shape[0], dtype=torch.uint8)
+        gt_flags = bboxes.new_zeros(bboxes.shape[0], dtype=torch.uint8)     # [all_h*w] 全零
         sampling_result = SamplingResult(pos_inds, neg_inds, bboxes, gt_bboxes,
                                          assign_result, gt_flags)
         return sampling_result

@@ -386,7 +386,7 @@ class RepPointsHead(AnchorFreeHead):
     def _point_target_single(self,
                              flat_proposals,    # init:[num_img,all_h*w,3]
                              valid_flags,       # [num_img,all_h*w]
-                             gt_bboxes,         # [torch.Size([1, 4])]
+                             gt_bboxes,         # [torch.Size([k, 4])]
                              gt_bboxes_ignore,
                              gt_labels,         # [tensor([0], device='cuda:0')]
                              label_channels=1,  # 1
@@ -400,12 +400,13 @@ class RepPointsHead(AnchorFreeHead):
 
         if stage == 'init':
             assigner = self.init_assigner
-            pos_weight = self.train_cfg.init.pos_weight
+            pos_weight = self.train_cfg.init.pos_weight     # -1
         else:
             assigner = self.refine_assigner
-            pos_weight = self.train_cfg.refine.pos_weight
+            pos_weight = self.train_cfg.refine.pos_weight   # -1
         assign_result = assigner.assign(proposals, gt_bboxes, gt_bboxes_ignore,
                                         None if self.sampling else gt_labels)
+        # mmdet/core/bbox/assigners/point_assigner.py
         sampling_result = self.sampler.sample(assign_result, proposals,
                                               gt_bboxes)
 
@@ -453,9 +454,16 @@ class RepPointsHead(AnchorFreeHead):
 
         return (labels, label_weights, bbox_gt, pos_proposals,
                 proposals_weights, pos_inds, neg_inds)
+        # labels:
+        # label_weights:
+        # bbox_gt:
+        # pos_proposals:
+        # proposals_weights:
+        # pos_inds:
+        # neg_inds:
 
     def get_targets(self,
-                    proposals_list,     # init:[num_imgs,num_levels,h*w,3]
+                    proposals_list,     # init:center_list[num_imgs,num_levels,h*w,3]
                     valid_flag_list,    # [num_imgs,num_levels,h*w]
                     gt_bboxes_list,     # [torch.Size([1, 4])]
                     img_metas,
@@ -464,6 +472,7 @@ class RepPointsHead(AnchorFreeHead):
                     stage='init',
                     label_channels=1,   # 1
                     unmap_outputs=True):# True
+        # p[i]和v[i]输入时为由num_level个元素组成的list,每个元素分别为[h*w,3]和[h*w]的tensor
         """Compute corresponding GT box and classification targets for
         proposals.
 
