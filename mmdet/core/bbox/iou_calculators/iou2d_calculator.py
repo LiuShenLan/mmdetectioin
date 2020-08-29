@@ -11,9 +11,9 @@ class BboxOverlaps2D(object):
         """Calculate IoU between 2D bboxes.
 
         Args:
-            bboxes1 (Tensor): bboxes have shape (m, 4) in <x1, y1, x2, y2>
+            bboxes1 (Tensor): bboxes have shape (m, 4) in <x1, y1, x2, y2>      # [torch.Size([k, 4])]
                 format, or shape (m, 5) in <x1, y1, x2, y2, score> format.
-            bboxes2 (Tensor): bboxes have shape (m, 4) in <x1, y1, x2, y2>
+            bboxes2 (Tensor): bboxes have shape (m, 4) in <x1, y1, x2, y2>      # [all_h*w,4]
                 format, shape (m, 5) in <x1, y1, x2, y2, score> format, or be
                 empty. If is_aligned is ``True``, then m and n must be equal.
             mode (str): "iou" (intersection over union) or iof (intersection
@@ -24,9 +24,9 @@ class BboxOverlaps2D(object):
         """
         assert bboxes1.size(-1) in [0, 4, 5]
         assert bboxes2.size(-1) in [0, 4, 5]
-        if bboxes2.size(-1) == 5:
+        if bboxes2.size(-1) == 5:       # False
             bboxes2 = bboxes2[..., :4]
-        if bboxes1.size(-1) == 5:
+        if bboxes1.size(-1) == 5:       # False
             bboxes1 = bboxes1[..., :4]
         return bbox_overlaps(bboxes1, bboxes2, mode, is_aligned)
 
@@ -44,8 +44,8 @@ def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
     bboxes1 and bboxes2.
 
     Args:
-        bboxes1 (Tensor): shape (m, 4) in <x1, y1, x2, y2> format or empty.
-        bboxes2 (Tensor): shape (n, 4) in <x1, y1, x2, y2> format or empty.
+        bboxes1 (Tensor): shape (m, 4) in <x1, y1, x2, y2> format or empty.     # [torch.Size([k, 4])]
+        bboxes2 (Tensor): shape (n, 4) in <x1, y1, x2, y2> format or empty.     # [all_h*w,4]
             If is_aligned is ``True``, then m and n must be equal.
         mode (str): "iou" (intersection over union) or iof (intersection over
             foreground).
@@ -84,15 +84,15 @@ def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
     assert (bboxes1.size(-1) == 4 or bboxes1.size(0) == 0)
     assert (bboxes2.size(-1) == 4 or bboxes2.size(0) == 0)
 
-    rows = bboxes1.size(0)
-    cols = bboxes2.size(0)
-    if is_aligned:
+    rows = bboxes1.size(0)      # k
+    cols = bboxes2.size(0)      # all_h*w
+    if is_aligned:  # False
         assert rows == cols
 
     if rows * cols == 0:
         return bboxes1.new(rows, 1) if is_aligned else bboxes1.new(rows, cols)
 
-    if is_aligned:
+    if is_aligned:  # False
         lt = torch.max(bboxes1[:, :2], bboxes2[:, :2])  # [rows, 2]
         rb = torch.min(bboxes1[:, 2:], bboxes2[:, 2:])  # [rows, 2]
 
@@ -108,16 +108,16 @@ def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
         else:
             union = area1
     else:
-        lt = torch.max(bboxes1[:, None, :2], bboxes2[:, :2])  # [rows, cols, 2]
-        rb = torch.min(bboxes1[:, None, 2:], bboxes2[:, 2:])  # [rows, cols, 2]
+        lt = torch.max(bboxes1[:, None, :2], bboxes2[:, :2])  # [rows, cols, 2]==[k,all_h*w,2]
+        rb = torch.min(bboxes1[:, None, 2:], bboxes2[:, 2:])  # [rows, cols, 2]==[k,all_h*w,2]
 
-        wh = (rb - lt).clamp(min=0)  # [rows, cols, 2]
-        overlap = wh[:, :, 0] * wh[:, :, 1]
-        area1 = (bboxes1[:, 2] - bboxes1[:, 0]) * (
+        wh = (rb - lt).clamp(min=0)  # [rows, cols, 2]==[k,all_h*w,2]   将元素夹紧
+        overlap = wh[:, :, 0] * wh[:, :, 1]     # [k,all_h*w]
+        area1 = (bboxes1[:, 2] - bboxes1[:, 0]) * (     # [k] gt_bbox面积
             bboxes1[:, 3] - bboxes1[:, 1])
 
         if mode == 'iou':
-            area2 = (bboxes2[:, 2] - bboxes2[:, 0]) * (
+            area2 = (bboxes2[:, 2] - bboxes2[:, 0]) * ( # [all_h*w] featmap_bbox面积
                 bboxes2[:, 3] - bboxes2[:, 1])
             union = area1[:, None] + area2 - overlap
         else:
@@ -127,4 +127,4 @@ def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
     union = torch.max(union, eps)
     ious = overlap / union
 
-    return ious
+    return ious     # [k,all_h*w]   [i][j]为第i个gt和第j个bbox的iou

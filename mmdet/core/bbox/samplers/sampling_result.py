@@ -32,11 +32,12 @@ class SamplingResult(util_mixins.NiceRepr):
         self.neg_inds = neg_inds    # [all_h*w-k] 每个元素为range(all_h*w),去掉bbox的index
         self.pos_bboxes = bboxes[pos_inds]  # [k] 取bbox的相应元素
         self.neg_bboxes = bboxes[neg_inds]
-        self.pos_is_gt = gt_flags[pos_inds]
+        self.pos_is_gt = gt_flags[pos_inds] # [k]
 
         self.num_gts = gt_bboxes.shape[0]   # ==k
         self.pos_assigned_gt_inds = assign_result.gt_inds[pos_inds] - 1
-        # [allh*w],背景为-1,bbox中心点为bbox_index(既从0到k-1)
+        # assign_result.gt_inds:[allh*w],背景为-1,bbox中心点为bbox_index(既从0到k-1)
+        # pos_assigned_gt_inds:[k],为gt_inds中对应的bbox的bbox_index的值(既0~k-1)
 
         if gt_bboxes.numel() == 0:  # gt_bboxes的元素数目为0
             # hack for index error case

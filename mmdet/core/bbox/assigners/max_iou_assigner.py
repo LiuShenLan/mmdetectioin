@@ -38,23 +38,23 @@ class MaxIoUAssigner(BaseAssigner):
     """
 
     def __init__(self,
-                 pos_iou_thr,
-                 neg_iou_thr,
-                 min_pos_iou=.0,
+                 pos_iou_thr,   # 0.5
+                 neg_iou_thr,   # 0.4
+                 min_pos_iou=.0,# 0
                  gt_max_assign_all=True,
                  ignore_iof_thr=-1,
                  ignore_wrt_candidates=True,
                  match_low_quality=True,
                  gpu_assign_thr=-1,
                  iou_calculator=dict(type='BboxOverlaps2D')):
-        self.pos_iou_thr = pos_iou_thr
-        self.neg_iou_thr = neg_iou_thr
-        self.min_pos_iou = min_pos_iou
-        self.gt_max_assign_all = gt_max_assign_all
-        self.ignore_iof_thr = ignore_iof_thr
-        self.ignore_wrt_candidates = ignore_wrt_candidates
-        self.gpu_assign_thr = gpu_assign_thr
-        self.match_low_quality = match_low_quality
+        self.pos_iou_thr = pos_iou_thr  # 0.5
+        self.neg_iou_thr = neg_iou_thr  # 0.4
+        self.min_pos_iou = min_pos_iou  # 0
+        self.gt_max_assign_all = gt_max_assign_all  # True
+        self.ignore_iof_thr = ignore_iof_thr    # -1
+        self.ignore_wrt_candidates = ignore_wrt_candidates  # True
+        self.gpu_assign_thr = gpu_assign_thr    # -1
+        self.match_low_quality = match_low_quality  # True
         self.iou_calculator = build_iou_calculator(iou_calculator)
 
     def assign(self, bboxes, gt_bboxes, gt_bboxes_ignore=None, gt_labels=None):
@@ -66,18 +66,22 @@ class MaxIoUAssigner(BaseAssigner):
         The assignment is done in following steps, the order matters.
 
         1. assign every bbox to the background
+            将所有的bbox设置为背景
         2. assign proposals whose iou with all gts < neg_iou_thr to 0
+            将与所有gt的iou<neg_iou_thr的proposals设为0
         3. for each bbox, if the iou with its nearest gt >= pos_iou_thr,
            assign it to that bbox
+            对所有的bbox,如果它与最近的gt的iou>=pos_iou_thr,将gt分配给那个bbox
         4. for each gt bbox, assign its nearest proposals (may be more than
            one) to itself
+            对于每个gt_bbox,将最近的proposals分配给它
 
         Args:
-            bboxes (Tensor): Bounding boxes to be assigned, shape(n, 4).
-            gt_bboxes (Tensor): Groundtruth boxes, shape (k, 4).
-            gt_bboxes_ignore (Tensor, optional): Ground truth bboxes that are
+            bboxes (Tensor): Bounding boxes to be assigned, shape(n, 4).        # [all_h*w,4]
+            gt_bboxes (Tensor): Groundtruth boxes, shape (k, 4).                # [torch.Size([k, 4])]
+            gt_bboxes_ignore (Tensor, optional): Ground truth bboxes that are   # None
                 labelled as `ignored`, e.g., crowd boxes in COCO.
-            gt_labels (Tensor, optional): Label of gt_bboxes, shape (k, ).
+            gt_labels (Tensor, optional): Label of gt_bboxes, shape (k, ).      # [k] label_index
 
         Returns:
             :obj:`AssignResult`: The assign result.
@@ -90,10 +94,10 @@ class MaxIoUAssigner(BaseAssigner):
             >>> expected_gt_inds = torch.LongTensor([1, 0])
             >>> assert torch.all(assign_result.gt_inds == expected_gt_inds)
         """
-        assign_on_cpu = True if (self.gpu_assign_thr > 0) and (
+        assign_on_cpu = True if (self.gpu_assign_thr > 0) and (     # False
             gt_bboxes.shape[0] > self.gpu_assign_thr) else False
         # compute overlap and assign gt on CPU when number of GT is large
-        if assign_on_cpu:
+        if assign_on_cpu:   # False
             device = bboxes.device
             bboxes = bboxes.cpu()
             gt_bboxes = gt_bboxes.cpu()
@@ -102,9 +106,9 @@ class MaxIoUAssigner(BaseAssigner):
             if gt_labels is not None:
                 gt_labels = gt_labels.cpu()
 
-        overlaps = self.iou_calculator(gt_bboxes, bboxes)
+        overlaps = self.iou_calculator(gt_bboxes, bboxes)   # [k,all_h*w] [i][j]为第i个gt和第j个bbox的iou
 
-        if (self.ignore_iof_thr > 0 and gt_bboxes_ignore is not None
+        if (self.ignore_iof_thr > 0 and gt_bboxes_ignore is not None    # False
                 and gt_bboxes_ignore.numel() > 0 and bboxes.numel() > 0):
             if self.ignore_wrt_candidates:
                 ignore_overlaps = self.iou_calculator(
@@ -117,7 +121,7 @@ class MaxIoUAssigner(BaseAssigner):
             overlaps[:, ignore_max_overlaps > self.ignore_iof_thr] = -1
 
         assign_result = self.assign_wrt_overlaps(overlaps, gt_labels)
-        if assign_on_cpu:
+        if assign_on_cpu:   # False
             assign_result.gt_inds = assign_result.gt_inds.to(device)
             assign_result.max_overlaps = assign_result.max_overlaps.to(device)
             if assign_result.labels is not None:
@@ -129,20 +133,22 @@ class MaxIoUAssigner(BaseAssigner):
 
         Args:
             overlaps (Tensor): Overlaps between k gt_bboxes and n bboxes,
-                shape(k, n).
-            gt_labels (Tensor, optional): Labels of k gt_bboxes, shape (k, ).
+                shape(k, n).    # [k,all_h*w] [i][j]为第i个gt和第j个bbox的iou
+            gt_labels (Tensor, optional): Labels of k gt_bboxes, shape (k, ).   # [k]
 
         Returns:
             :obj:`AssignResult`: The assign result.
         """
         num_gts, num_bboxes = overlaps.size(0), overlaps.size(1)
+        # num_gts:k
+        # num_bboxes:all_h*w
 
         # 1. assign -1 by default
-        assigned_gt_inds = overlaps.new_full((num_bboxes, ),
+        assigned_gt_inds = overlaps.new_full((num_bboxes, ),    # [all_h*w] 全为-1
                                              -1,
                                              dtype=torch.long)
 
-        if num_gts == 0 or num_bboxes == 0:
+        if num_gts == 0 or num_bboxes == 0: # False
             # No ground truth or boxes, return empty assignment
             max_overlaps = overlaps.new_zeros((num_bboxes, ))
             if num_gts == 0:
@@ -163,13 +169,18 @@ class MaxIoUAssigner(BaseAssigner):
         # for each anchor, which gt best overlaps with it
         # for each anchor, the max iou of all gts
         max_overlaps, argmax_overlaps = overlaps.max(dim=0)
+        # max_overlaps:[all_h*w]    每个bbox与所有的gt的iou最大值
+        # argmax_overlaps:[all_h*w] 最大值索引
+
         # for each gt, which anchor best overlaps with it
         # for each gt, the max iou of all proposals
         gt_max_overlaps, gt_argmax_overlaps = overlaps.max(dim=1)
+        # gt_max_overlaps:[k]    每个gt与所有的bbox的iou最大值
+        # gt_argmax_overlaps:[k] 最大值索引
 
         # 2. assign negative: below
         # the negative inds are set to be 0
-        if isinstance(self.neg_iou_thr, float):
+        if isinstance(self.neg_iou_thr, float): # True 0.4
             assigned_gt_inds[(max_overlaps >= 0)
                              & (max_overlaps < self.neg_iou_thr)] = 0
         elif isinstance(self.neg_iou_thr, tuple):
@@ -178,10 +189,11 @@ class MaxIoUAssigner(BaseAssigner):
                              & (max_overlaps < self.neg_iou_thr[1])] = 0
 
         # 3. assign positive: above positive IoU threshold
-        pos_inds = max_overlaps >= self.pos_iou_thr
+        pos_inds = max_overlaps >= self.pos_iou_thr # 0.5
         assigned_gt_inds[pos_inds] = argmax_overlaps[pos_inds] + 1
+        # [all_h*w] 每个bbox与gt的iou,大于阈值为pos为gt_index,neg为０,其余为-1
 
-        if self.match_low_quality:
+        if self.match_low_quality:  # True
             # Low-quality matching will overwirte the assigned_gt_inds assigned
             # in Step 3. Thus, the assigned gt might not be the best one for
             # prediction.
@@ -191,8 +203,8 @@ class MaxIoUAssigner(BaseAssigner):
             # assigned_gt_inds will be overwritten to be bbox B.
             # This might be the reason that it is not used in ROI Heads.
             for i in range(num_gts):
-                if gt_max_overlaps[i] >= self.min_pos_iou:
-                    if self.gt_max_assign_all:
+                if gt_max_overlaps[i] >= self.min_pos_iou:  # >=0
+                    if self.gt_max_assign_all:  # True
                         max_iou_inds = overlaps[i, :] == gt_max_overlaps[i]
                         assigned_gt_inds[max_iou_inds] = i + 1
                     else:
@@ -203,10 +215,14 @@ class MaxIoUAssigner(BaseAssigner):
             pos_inds = torch.nonzero(
                 assigned_gt_inds > 0, as_tuple=False).squeeze()
             if pos_inds.numel() > 0:
-                assigned_labels[pos_inds] = gt_labels[
+                assigned_labels[pos_inds] = gt_labels[  # [all_h*w]将每个bbox与gt的iou中的pos部分设置为gt_label,其余为-1
                     assigned_gt_inds[pos_inds] - 1]
         else:
             assigned_labels = None
 
         return AssignResult(
             num_gts, assigned_gt_inds, max_overlaps, labels=assigned_labels)
+        # num_gts:          k个gt_bbox
+        # assigned_gt_inds: [all_h*w] 每个bbox与gt的iou,大于阈值为pos为gt_index,neg为０
+        # max_overlaps:     [all_h*w] 每个bbox与所有的gt的iou最大值
+        # assigned_labels:  [all_h*w]将每个bbox与gt的iou中的pos部分设置为gt_label,其余为-1

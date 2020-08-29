@@ -25,8 +25,8 @@ class PseudoSampler(BaseSampler):
 
         Args:
             assign_result (:obj:`AssignResult`): Assigned results
-            bboxes (torch.Tensor): Bounding boxes
-            gt_bboxes (torch.Tensor): Ground truth boxes
+            bboxes (torch.Tensor): Bounding boxes           [all_h*w,4]
+            gt_bboxes (torch.Tensor): Ground truth boxes    [k,4]
 
         Returns:
             :obj:`SamplingResult`: sampler results

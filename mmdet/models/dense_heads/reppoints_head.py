@@ -384,7 +384,7 @@ class RepPointsHead(AnchorFreeHead):
         return pts_list # [num_img,h*w,18]  reppoints点坐标
 
     def _point_target_single(self,
-                             flat_proposals,    # init:[num_img,all_h*w,3]
+                             flat_proposals,    # init:[num_img,all_h*w,3/4]
                              valid_flags,       # [num_img,all_h*w]
                              gt_bboxes,         # [torch.Size([k, 4])]
                              gt_bboxes_ignore,
@@ -396,44 +396,44 @@ class RepPointsHead(AnchorFreeHead):
         if not inside_flags.any():
             return (None, ) * 7
         # assign gt and sample proposals
-        proposals = flat_proposals[inside_flags, :] # [all_h*w,3]
+        proposals = flat_proposals[inside_flags, :] # [all_h*w,3/4]
 
         if stage == 'init':
-            assigner = self.init_assigner
+            assigner = self.init_assigner   # 'PointAssigner'
             pos_weight = self.train_cfg.init.pos_weight     # -1
         else:
-            assigner = self.refine_assigner
+            assigner = self.refine_assigner # 'MaxIoUAssigner'
             pos_weight = self.train_cfg.refine.pos_weight   # -1
         assign_result = assigner.assign(proposals, gt_bboxes, gt_bboxes_ignore,
                                         None if self.sampling else gt_labels)
-        # mmdet/core/bbox/assigners/point_assigner.py
+        # mmdet/core/bbox/assigners/point_assigner.py       init
+        # mmdet/core/bbox/assigners/max_iou_assigner.py     refine
         sampling_result = self.sampler.sample(assign_result, proposals,
                                               gt_bboxes)
 
-        num_valid_proposals = proposals.shape[0]    # all_h*w
-        bbox_gt = proposals.new_zeros([num_valid_proposals, 4]) # [all_h*w,4]
-        pos_proposals = torch.zeros_like(proposals) # [all_h*w,3]
-        proposals_weights = proposals.new_zeros([num_valid_proposals, 4])   # [all_h*w,4]
-        labels = proposals.new_full((num_valid_proposals, ),    # [all_h*w]
+        num_valid_proposals = proposals.shape[0]    # ==all_h*w
+        bbox_gt = proposals.new_zeros([num_valid_proposals, 4]) # [all_h*w,4] 全0
+        pos_proposals = torch.zeros_like(proposals) # [all_h*w,3/4] 全0
+        proposals_weights = proposals.new_zeros([num_valid_proposals, 4])   # [all_h*w,4] 全0
+        labels = proposals.new_full((num_valid_proposals, ),    # [all_h*w] 全1
                                     self.background_label,
                                     dtype=torch.long)
-        label_weights = proposals.new_zeros(        # [all_h*w]
+        label_weights = proposals.new_zeros(        # [all_h*w] 全0
             num_valid_proposals, dtype=torch.float)
 
-        pos_inds = sampling_result.pos_inds     # positive_index    tensor[pos_num]
-        neg_inds = sampling_result.neg_inds     # negative_index    tensor[neg_num]
+        pos_inds = sampling_result.pos_inds     # tensor[k] 每个元素为bbox的index
+        neg_inds = sampling_result.neg_inds     # tensor[all_h*w-k] 每个元素为range(all_h*w),去掉bbox的index
         if len(pos_inds) > 0:
-            pos_gt_bboxes = sampling_result.pos_gt_bboxes   # tensor[n,4]
-            bbox_gt[pos_inds, :] = pos_gt_bboxes
-            print(bbox_gt.shape)
-            pos_proposals[pos_inds, :] = proposals[pos_inds, :]
-            proposals_weights[pos_inds, :] = 1.0
-            if gt_labels is None:
+            pos_gt_bboxes = sampling_result.pos_gt_bboxes   # torch.Size([k, 4])
+            bbox_gt[pos_inds, :] = pos_gt_bboxes    # [all_h*w,4] gt_box中心点的相应位置设置为gtbbox的坐标点
+            pos_proposals[pos_inds, :] = proposals[pos_inds, :] # 将pos_proposals的点的positive位置设置为与proposals相同
+            proposals_weights[pos_inds, :] = 1.0    # [all_h*w,4] positive位置为1,其余为0
+            if gt_labels is None:   # False
                 labels[pos_inds] = 1
             else:
-                labels[pos_inds] = gt_labels[
-                    sampling_result.pos_assigned_gt_inds]
-            if pos_weight <= 0:
+                labels[pos_inds] = gt_labels[   # [all_h*w] 将label中的对应gt的值设置为与gt_label相同,其余全1
+                    sampling_result.pos_assigned_gt_inds]   # sampling_result.pos_assigned_gt_inds:[k],为gt_inds中对应的bbox的bbox_index的值(既0~k-1)
+            if pos_weight <= 0: # True
                 label_weights[pos_inds] = 1.0
             else:
                 label_weights[pos_inds] = pos_weight
@@ -454,18 +454,18 @@ class RepPointsHead(AnchorFreeHead):
 
         return (labels, label_weights, bbox_gt, pos_proposals,
                 proposals_weights, pos_inds, neg_inds)
-        # labels:
-        # label_weights:
-        # bbox_gt:
-        # pos_proposals:
-        # proposals_weights:
-        # pos_inds:
-        # neg_inds:
+        # labels: [all_h*w],bbox中心点为0,其余为1
+        # label_weights: [all_h*w] pos和neg位置为为1,其余为0
+        # bbox_gt: [all_h*w,4] bbox中心点的相应位置为bbox的坐标点,其余全0
+        # pos_proposals: [all_h*w,3/4] pos位置与proposals相同,其余全0
+        # proposals_weights: [all_h*w,4] pos位置为1,其余为0
+        # pos_inds: tensor[k] 每个元素为bbox的index
+        # neg_inds: tensor[all_h*w-k] 每个元素为range(all_h*w),去掉bbox的index
 
     def get_targets(self,
-                    proposals_list,     # init:center_list[num_imgs,num_levels,h*w,3]
+                    proposals_list,     # init:center_list[num_imgs,num_levels,h*w,3] refine:[num_img,num_level,h*w,4]
                     valid_flag_list,    # [num_imgs,num_levels,h*w]
-                    gt_bboxes_list,     # [torch.Size([1, 4])]
+                    gt_bboxes_list,     # [torch.Size([k, 4])]
                     img_metas,
                     gt_bboxes_ignore_list=None,
                     gt_labels_list=None,# [tensor([0], device='cuda:0')]
@@ -514,7 +514,7 @@ class RepPointsHead(AnchorFreeHead):
         for i in range(num_imgs):
             assert len(proposals_list[i]) == len(valid_flag_list[i])
             # p[i]和v[i]输入时为由num_level个元素组成的list,每个元素分别为[h*w,3]和[h*w]的tensor
-            proposals_list[i] = torch.cat(proposals_list[i])    # [num_img,all_h*w,3]
+            proposals_list[i] = torch.cat(proposals_list[i])    # [num_img,all_h*w,3/4]
             valid_flag_list[i] = torch.cat(valid_flag_list[i])  # [num_img,all_h*w]
             # 输出时,p[i]和v[i]为将所有的level叠加在一起的[(all level)h*w,3]和[(all level)h*w]的tensor
 
@@ -534,13 +534,22 @@ class RepPointsHead(AnchorFreeHead):
              stage=stage,
              label_channels=label_channels,
              unmap_outputs=unmap_outputs)
+        # all_labels: 长度为num_img的list,元素为[all_h*w],bbox中心点为0,其余为1
+        # all_label_weights: 长度为num_img的list,元素为[all_h*w] pos和neg位置为为1,其余为0
+        # all_bbox_gt: 长度为num_img的list,元素为[all_h*w,4] bbox中心点的相应位置为bbox的坐标点,其余全0
+        # all_proposals: 长度为num_img的list,元素为[all_h*w,3/4] pos位置与proposals_list相同,其余全0
+        # all_proposal_weights: 长度为num_img的list,元素为[all_h*w,4] pos位置为1,其余为0
+        # pos_inds_list: tensor[k] 元素为bbox的index
+        # neg_inds_list: tensor[all_h*w-k] 元素为range(all_h*w),去掉bbox的index
+
         # no valid points
         if any([labels is None for labels in all_labels]):
             return None
         # sampled points of all images
-        num_total_pos = sum([max(inds.numel(), 1) for inds in pos_inds_list])
-        num_total_neg = sum([max(inds.numel(), 1) for inds in neg_inds_list])
+        num_total_pos = sum([max(inds.numel(), 1) for inds in pos_inds_list])   # ==k,所有img的pos的总数
+        num_total_neg = sum([max(inds.numel(), 1) for inds in neg_inds_list])   # ==all_h*w-k,所有img的neg的总数
         labels_list = images_to_levels(all_labels, num_level_proposals)
+
         label_weights_list = images_to_levels(all_label_weights,
                                               num_level_proposals)
         bbox_gt_list = images_to_levels(all_bbox_gt, num_level_proposals)
@@ -549,21 +558,43 @@ class RepPointsHead(AnchorFreeHead):
                                                  num_level_proposals)
         return (labels_list, label_weights_list, bbox_gt_list, proposals_list,
                 proposal_weights_list, num_total_pos, num_total_neg)
+        # labels_list:长度为[num_level]的list,元素为tensor(num_img,all_h*w),gt_bbox中心点为0,其余为1
+        # label_weights_list:[num_level],tensor(num_img,all_h*w),pos和neg位置为为1,其余为0
+        # bbox_gt_list:[num_level],tensor(num_img,all_h*w,4),bbox中心点的相应位置为bbox的坐标点,其余全0
+        # proposals_list:[num_level],tensor(num_img,all_h*w,3/4),pos位置与proposals_list相同,其余全0
+        # proposal_weights_list:[num_level],tensor(num_img,all_h*w,4),pos位置为1,其余为0
+        # num_total_pos:所有img的pos的总数
+        # num_total_neg:所有img的neg的总数
 
     def loss_single(self, cls_score, pts_pred_init, pts_pred_refine, labels,
                     label_weights, bbox_gt_init, bbox_weights_init,
                     bbox_gt_refine, bbox_weights_refine, stride,
                     num_total_samples_init, num_total_samples_refine):
+        """
+        :param cls_score: [num_img,1,h,w]
+        :param pts_pred_init: [num_img,h*w,18]
+        :param pts_pred_refine: [num_img,h*w,18]
+        :param labels: [num_img,h*w]
+        :param label_weights: [num_img,h*w]
+        :param bbox_gt_init: [num_img,h*w,4]
+        :param bbox_weights_init: [num_img,h*w,4]
+        :param bbox_gt_refine: [num_img,h*w,4]
+        :param bbox_weights_refine: [num_img,h*w,4]
+        :param stride: ==8/16/32/64/128
+        :param num_total_samples_init: k
+        :param num_total_samples_refine: k
+        """
         # classification loss
-        labels = labels.reshape(-1)
-        label_weights = label_weights.reshape(-1)
-        cls_score = cls_score.permute(0, 2, 3,
+        labels = labels.reshape(-1)     # [num_img*h*w]
+        label_weights = label_weights.reshape(-1)   # [num_img*h*w]
+        cls_score = cls_score.permute(0, 2, 3,  # [num_img*h*w,1]
                                       1).reshape(-1, self.cls_out_channels)
         loss_cls = self.loss_cls(
             cls_score,
             labels,
             label_weights,
             avg_factor=num_total_samples_refine)
+        # dict(type='FocalLoss', use_sigmoid=True, gamma=2.0, alpha=0.25, loss_weight=1.0),
 
         # points loss
         bbox_gt_init = bbox_gt_init.reshape(-1, 4)
@@ -574,25 +605,27 @@ class RepPointsHead(AnchorFreeHead):
         bbox_weights_refine = bbox_weights_refine.reshape(-1, 4)
         bbox_pred_refine = self.points2bbox(
             pts_pred_refine.reshape(-1, 2 * self.num_points), y_first=False)
-        normalize_term = self.point_base_scale * stride
+        normalize_term = self.point_base_scale * stride # 4*stride
         loss_pts_init = self.loss_bbox_init(
-            bbox_pred_init / normalize_term,
-            bbox_gt_init / normalize_term,
-            bbox_weights_init,
-            avg_factor=num_total_samples_init)
+            bbox_pred_init / normalize_term,    # [h*w,4]
+            bbox_gt_init / normalize_term,      # [h*w,4]
+            bbox_weights_init,                  # [h*w,4]
+            avg_factor=num_total_samples_init)  # ==k
+        # dict(type='SmoothL1Loss', beta=0.11, loss_weight=0.5)
         loss_pts_refine = self.loss_bbox_refine(
-            bbox_pred_refine / normalize_term,
-            bbox_gt_refine / normalize_term,
-            bbox_weights_refine,
+            bbox_pred_refine / normalize_term,  # [h*w,4]
+            bbox_gt_refine / normalize_term,    # [h*w,4]
+            bbox_weights_refine,                # [h*w,4]
             avg_factor=num_total_samples_refine)
+        # dict(type='SmoothL1Loss', beta=0.11, loss_weight=1.0)
         return loss_cls, loss_pts_init, loss_pts_refine
 
     def loss(self,
              cls_scores,        # [num_level,num_img,1,h,w]   5个元素组成的list,每个元素为tensor [num_img,1,h,w],
              pts_preds_init,    # [num_level,num_img,18,h,w]  每张图片的h与w不同,举例为[100,148],[50,74],[25,37],[13,19],[7,10]
              pts_preds_refine,  # [num_level,num_img,18,h,w]
-             gt_bboxes,         # [torch.Size([1, 4])]
-             gt_keypoints,      # [torch.Size([1, 51])]
+             gt_bboxes,         # [torch.Size([k, 4])]
+             gt_keypoints,      # [torch.Size([k, 51])]
              gt_labels,         # [tensor([0], device='cuda:0')]
              img_metas,
              gt_bboxes_ignore=None,
@@ -608,7 +641,7 @@ class RepPointsHead(AnchorFreeHead):
         # center_list: [num_imgs,num_levels,h*w,3]  valid_flag_list:[num_imgs,num_levels,h*w]
         pts_coordinate_preds_init = self.offset_to_pts(center_list,
                                                        pts_preds_init)
-        # pts_coordinate_preds_init: [num_img,h*w,18]  reppoints点坐标
+        # pts_coordinate_preds_init: [num_level,num_img,h*w,18]  reppoints点坐标
         if self.train_cfg.init.assigner['type'] == 'PointAssigner': # True
             # Assign target for center list
             candidate_list = center_list
@@ -628,31 +661,33 @@ class RepPointsHead(AnchorFreeHead):
             label_channels=label_channels)
         (*_, bbox_gt_list_init, candidate_list_init, bbox_weights_list_init,
          num_total_pos_init, num_total_neg_init) = cls_reg_targets_init
-        num_total_samples_init = (
+        num_total_samples_init = (  # False =num_total_pos_init,为所有img的pos的总数
             num_total_pos_init +
             num_total_neg_init if self.sampling else num_total_pos_init)
 
         # target for refinement stage
         center_list, valid_flag_list = self.get_points(featmap_sizes,
                                                        img_metas)
+        # center_list: [num_imgs,num_levels,h*w,3]  valid_flag_list:[num_imgs,num_levels,h*w]
         pts_coordinate_preds_refine = self.offset_to_pts(
             center_list, pts_preds_refine)
+        # pts_coordinate_preds_refine: [num_level,num_img,h*w,18]  reppoints点坐标
         bbox_list = []
         for i_img, center in enumerate(center_list):
             bbox = []
-            for i_lvl in range(len(pts_preds_refine)):
+            for i_lvl in range(len(pts_preds_refine)):  # range(len(num_level))
                 bbox_preds_init = self.points2bbox(
-                    pts_preds_init[i_lvl].detach())
+                    pts_preds_init[i_lvl].detach()) # .detach():不计算梯度
                 bbox_shift = bbox_preds_init * self.point_strides[i_lvl]
                 bbox_center = torch.cat(
                     [center[i_lvl][:, :2], center[i_lvl][:, :2]], dim=1)
-                bbox.append(bbox_center +
+                bbox.append(bbox_center +   # [num_level,h*w,4]
                             bbox_shift[i_img].permute(1, 2, 0).reshape(-1, 4))
-            bbox_list.append(bbox)
+            bbox_list.append(bbox)  # [num_img,num_level,h*w,4]
         cls_reg_targets_refine = self.get_targets(
-            bbox_list,
-            valid_flag_list,
-            gt_bboxes,
+            bbox_list,          # [num_img,num_level,h*w,4]
+            valid_flag_list,    # [num_imgs,num_levels,h*w]
+            gt_bboxes,          # [torch.Size([k, 4])]
             img_metas,
             gt_bboxes_ignore_list=gt_bboxes_ignore,
             gt_labels_list=gt_labels,
@@ -668,18 +703,18 @@ class RepPointsHead(AnchorFreeHead):
         # compute loss
         losses_cls, losses_pts_init, losses_pts_refine = multi_apply(
             self.loss_single,
-            cls_scores,
-            pts_coordinate_preds_init,
-            pts_coordinate_preds_refine,
-            labels_list,
-            label_weights_list,
-            bbox_gt_list_init,
-            bbox_weights_list_init,
-            bbox_gt_list_refine,
-            bbox_weights_list_refine,
-            self.point_strides,
-            num_total_samples_init=num_total_samples_init,
-            num_total_samples_refine=num_total_samples_refine)
+            cls_scores,                 # [num_level,num_img,1,h,w]
+            pts_coordinate_preds_init,  # [num_level,num_img,h*w,18]
+            pts_coordinate_preds_refine,# [num_level,num_img,h*w,18]
+            labels_list,                # [num_level,num_img,h*w]
+            label_weights_list,         # [num_level,num_img,h*w]
+            bbox_gt_list_init,          # [num_level,num_img,h*w,4]
+            bbox_weights_list_init,     # [num_level,num_img,h*w,4]
+            bbox_gt_list_refine,        # [num_level,num_img,h*w,4]
+            bbox_weights_list_refine,   # [num_level,num_img,h*w,4]
+            self.point_strides,         # [8,16,32,64,128]
+            num_total_samples_init=num_total_samples_init,      # k
+            num_total_samples_refine=num_total_samples_refine)  # k
         loss_dict_all = {
             'loss_cls': losses_cls,
             'loss_pts_init': losses_pts_init,
