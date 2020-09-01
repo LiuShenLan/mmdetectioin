@@ -20,7 +20,7 @@ class PseudoSampler(BaseSampler):
         """Sample negative samples."""
         raise NotImplementedError
 
-    def sample(self, assign_result, bboxes, gt_bboxes, **kwargs):
+    def sample(self, assign_result, bboxes, gt_bboxes, gt_keypoints, **kwargs):
         """Directly returns the positive and negative indices  of samples.
 
         Args:
@@ -37,6 +37,6 @@ class PseudoSampler(BaseSampler):
         neg_inds = torch.nonzero(   # [all_h*w-k] 每个元素为range(all_h*w),去掉bbox的index
             assign_result.gt_inds == 0, as_tuple=False).squeeze(-1).unique()
         gt_flags = bboxes.new_zeros(bboxes.shape[0], dtype=torch.uint8)     # [all_h*w] 全零
-        sampling_result = SamplingResult(pos_inds, neg_inds, bboxes, gt_bboxes,
+        sampling_result = SamplingResult(pos_inds, neg_inds, bboxes, gt_bboxes, gt_keypoints,
                                          assign_result, gt_flags)
         return sampling_result

@@ -20,7 +20,7 @@ class BboxOverlaps2D(object):
                 over foreground).
 
         Returns:
-            ious(Tensor): shape (m, n) if is_aligned == False else shape (m, 1)
+            ious(Tensor): shape (m, n) if is_aligned == False else shape (m, 1) # [k,all_h*w]
         """
         assert bboxes1.size(-1) in [0, 4, 5]
         assert bboxes2.size(-1) in [0, 4, 5]

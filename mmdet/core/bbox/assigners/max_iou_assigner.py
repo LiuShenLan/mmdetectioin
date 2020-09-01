@@ -191,7 +191,7 @@ class MaxIoUAssigner(BaseAssigner):
         # 3. assign positive: above positive IoU threshold
         pos_inds = max_overlaps >= self.pos_iou_thr # 0.5
         assigned_gt_inds[pos_inds] = argmax_overlaps[pos_inds] + 1
-        # [all_h*w] 每个bbox与gt的iou,大于阈值为pos为gt_index,neg为０,其余为-1
+        # [all_h*w] 每个bbox与gt的iou,大于阈值为pos为gt_index(从1开始),neg为０,其余为-1
 
         if self.match_low_quality:  # True
             # Low-quality matching will overwirte the assigned_gt_inds assigned

@@ -22,32 +22,36 @@ class SamplingResult(util_mixins.NiceRepr):
         })>
     """
 
-    def __init__(self, pos_inds, neg_inds, bboxes, gt_bboxes, assign_result,
-                 gt_flags):
+    def __init__(self, pos_inds, neg_inds, bboxes, gt_bboxes, gt_keypoints,
+                 assign_result, gt_flags):
         # bboxes:init:proposal[all_h*w,3]
         # gt_bboxes:[torch.Size([k, 4])]
+        # gt_keypoints:[torch.Size([k, 51])]
         # assign_result:assign_result
         # gt_flags:[all_h*w] 全零
-        self.pos_inds = pos_inds    # [k] 每个元素为bbox的index
-        self.neg_inds = neg_inds    # [all_h*w-k] 每个元素为range(all_h*w),去掉bbox的index
+        self.pos_inds = pos_inds    # [k] 每个元素为bbox的index   !
+        self.neg_inds = neg_inds    # [all_h*w-k] 每个元素为range(all_h*w),去掉bbox的index  !
         self.pos_bboxes = bboxes[pos_inds]  # [k] 取bbox的相应元素
         self.neg_bboxes = bboxes[neg_inds]
         self.pos_is_gt = gt_flags[pos_inds] # [k]
 
         self.num_gts = gt_bboxes.shape[0]   # ==k
-        self.pos_assigned_gt_inds = assign_result.gt_inds[pos_inds] - 1
+        self.pos_assigned_gt_inds = assign_result.gt_inds[pos_inds] - 1     # !
         # assign_result.gt_inds:[allh*w],背景为-1,bbox中心点为bbox_index(既从0到k-1)
         # pos_assigned_gt_inds:[k],为gt_inds中对应的bbox的bbox_index的值(既0~k-1)
 
         if gt_bboxes.numel() == 0:  # gt_bboxes的元素数目为0
             # hack for index error case
             assert self.pos_assigned_gt_inds.numel() == 0
-            self.pos_gt_bboxes = torch.empty_like(gt_bboxes).view(-1, 4)
+            self.pos_gt_bboxes = torch.empty_like(gt_bboxes).view(-1, 4)    # !
+            self.pos_gt_keypoints = torch.empty_like(gt_keypoints).view(-1, 51)    # !
         else:
             if len(gt_bboxes.shape) < 2:
                 gt_bboxes = gt_bboxes.view(-1, 4)
+                gt_keypoints = gt_keypoints.view(-1,51)
 
-            self.pos_gt_bboxes = gt_bboxes[self.pos_assigned_gt_inds, :]
+            self.pos_gt_bboxes = gt_bboxes[self.pos_assigned_gt_inds, :]    # !
+            self.pos_gt_keypoints = gt_keypoints[self.pos_assigned_gt_inds, :]    # !
             # 将gt_bboxes按照pos_assigned_gt_inds的顺序排列
 
         if assign_result.labels is not None:

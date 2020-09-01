@@ -81,39 +81,49 @@ class PointAssigner(BaseAssigner):
         # stores the assigned gt index of each point
         assigned_gt_inds = points.new_zeros((num_points, ), dtype=torch.long)   # [all_h*w],全为0
         # stores the assigned gt dist (to this point) of each point
-        assigned_gt_dist = points.new_full((num_points, ), float('inf'))        # [all_h*w],全为inf
+        assigned_gt_dist = points.new_full((num_points, ), float('inf'))        # [all_h*w]
         points_range = torch.arange(points.shape[0])    # [all_h*w]=[0,1,...all_h*w-1]
 
         for idx in range(num_gts):  # 遍历k个bbox
             gt_lvl = gt_bboxes_lvl[idx]
+
             # get the index of points in this level 计算与该点相同level的index
             lvl_idx = gt_lvl == points_lvl  # [all_h*w],在points_lvl中与gt_lvl相同的设置为True,其余为False
             points_index = points_range[lvl_idx]    # [本level坐标点数目],只取points_range中与gt相同lvl的值
+
             # get the points in this level
             lvl_points = points_xy[lvl_idx, :]      # 只取该level的点的坐标
             # get the center point of gt
             gt_point = gt_bboxes_xy[[idx], :]   # 本次遍历所取的gt中心点坐标
             # get width and height of gt
             gt_wh = gt_bboxes_wh[[idx], :]      # 本次遍历所取的gt_box宽高
+
             # compute the distance between gt center and
             #   all points in this level
             points_gt_dist = ((lvl_points - gt_point) / gt_wh).norm(dim=1)  # [本level坐标点数目]
+
             # find the nearest k points to gt center in this level
             min_dist, min_dist_index = torch.topk(              # min_dist:featmap点距离gtbox中心点最小距离
                 points_gt_dist, self.pos_num, largest=False)    # min_dist_index:最近点的index
+
             # the index of nearest k points to gt center in this level
             min_dist_points_index = points_index[min_dist_index]    # 最近点在points中的index
+
             # The less_than_recorded_index stores the index
             #   of min_dist that is less then the assigned_gt_dist. Where
             #   assigned_gt_dist stores the dist from previous assigned gt
             #   (if exist) to each point.
+            # less_than_recorded_index存储了最小距离比assigned_gi_dist(存储了之前遍历的gt到每个点的最小距离)的点的index
             less_than_recorded_index = min_dist < assigned_gt_dist[
                 min_dist_points_index]
+
             # The min_dist_points_index stores the index of points satisfy:
             #   (1) it is k nearest to current gt center in this level.
             #   (2) it is closer to current gt center than other gt center.
+            # min_dist_points_index存储了本level距离当前gt最近的,并且不会距离其他gt更近的k个点
             min_dist_points_index = min_dist_points_index[
                 less_than_recorded_index]
+
             # assign the result
             assigned_gt_inds[min_dist_points_index] = idx + 1
             assigned_gt_dist[min_dist_points_index] = min_dist[
