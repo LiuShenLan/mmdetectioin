@@ -11,10 +11,13 @@ from .voc import VOCDataset
 from .wider_face import WIDERFaceDataset
 from .xml_style import XMLDataset
 
+from .citypersons_voc import CitypersonsVocDataset
+
 __all__ = [
     'CustomDataset', 'XMLDataset', 'CocoDataset', 'DeepFashionDataset',
     'VOCDataset', 'CityscapesDataset', 'LVISDataset', 'GroupSampler',
     'DistributedGroupSampler', 'DistributedSampler', 'build_dataloader',
     'ConcatDataset', 'RepeatDataset', 'ClassBalancedDataset',
-    'WIDERFaceDataset', 'DATASETS', 'PIPELINES', 'build_dataset'
+    'WIDERFaceDataset', 'DATASETS', 'PIPELINES', 'build_dataset',
+    'CitypersonsVocDataset'
 ]

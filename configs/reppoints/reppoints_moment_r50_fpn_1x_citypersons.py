@@ -1,5 +1,5 @@
 _base_ = [
-    '../_base_/datasets/coco_detection.py',
+    '../_base_/datasets/citypersons_voc.py',
     '../_base_/schedules/schedule_1x.py', '../_base_/default_runtime.py'
 ]
 model = dict(
@@ -23,7 +23,7 @@ model = dict(
         num_outs=5),
     bbox_head=dict(
         type='RepPointsHead',
-        num_classes=1,
+        num_classes=6,          # class
         in_channels=256,
         feat_channels=256,
         point_feat_channels=256,
@@ -39,12 +39,7 @@ model = dict(
             alpha=0.25,
             loss_weight=1.0),
         loss_bbox_init=dict(type='SmoothL1Loss', beta=0.11, loss_weight=0.5),
-        loss_keypoint_init=dict(type='SmoothL1Loss', beta=0.11, loss_weight=0.5),
         loss_bbox_refine=dict(type='SmoothL1Loss', beta=0.11, loss_weight=1.0),
-        loss_keypoint_refine=dict(type='SmoothL1Loss', beta=0.11, loss_weight=1.0),
-        keypoint_select=[0,7,8,9,10,13,14,15,16],
-        # 0:鼻子 1:左眼 2:右眼 3:左耳 4:右耳 5:左肩 6:右肩 7:左肘 8:右肘
-        # 9:左腕 10:右腕 11:左臀 12:右臀 13:左膝 14:右膝 15:左踝 16:右踝
         transform_method='moment'))
 # training and testing settings
 train_cfg = dict(

@@ -1,5 +1,9 @@
 import mmcv
 
+def citypersonsvoc_classes():
+    return [
+        'ignore', 'pedestrians', 'riders', 'sitting', 'other', 'group'
+    ]
 
 def wider_face_classes():
     return ['face']
@@ -95,7 +99,8 @@ dataset_aliases = {
     'imagenet_vid': ['vid', 'imagenet_vid', 'ilsvrc_vid'],
     'coco': ['coco', 'mscoco', 'ms_coco'],
     'wider_face': ['WIDERFaceDataset', 'wider_face', 'WDIERFace'],
-    'cityscapes': ['cityscapes']
+    'cityscapes': ['cityscapes'],
+    'citypersonsvoc': ['citypersonsvoc']
 }
 
 
