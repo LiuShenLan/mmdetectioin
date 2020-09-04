@@ -1,6 +1,6 @@
 _base_ = [
     '../_base_/datasets/citypersons_voc.py',
-    '../_base_/schedules/schedule_4x.py', '../_base_/default_runtime.py'
+    '../_base_/schedules/schedule_2x.py', '../_base_/default_runtime.py'
 ]
 model = dict(
     type='RepPointsDetector',
@@ -64,4 +64,4 @@ test_cfg = dict(
     score_thr=0.05,
     nms=dict(type='nms', iou_threshold=0.5),
     max_per_img=100)
-optimizer = dict(lr=0.005)
+optimizer = dict(lr=0.0025)
