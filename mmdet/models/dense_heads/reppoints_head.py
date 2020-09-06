@@ -805,6 +805,7 @@ class RepPointsHead(AnchorFreeHead):
             mlvl_scores = torch.cat([mlvl_scores, padding], dim=1)
         
         ### Save
+        """
         num_classes = mlvl_scores.size(1) - 1
         reppoints_save = mlvl_reppoints[:, None].expand(-1, num_classes, 9,2)   # [level*h*w, classes, 9,2]
         scores = mlvl_scores[:, :-1]    # [level*h*w,classes]
@@ -816,6 +817,7 @@ class RepPointsHead(AnchorFreeHead):
             pickle.dump(reppoints_save,f)
         # with open(pickle_file,'rb') as f:
         #     data = pickle.load(reppoints_save)
+        """
         ###
 
         if nms:

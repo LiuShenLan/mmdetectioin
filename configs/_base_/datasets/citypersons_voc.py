@@ -1,6 +1,6 @@
 # dataset settings
 dataset_type = 'CitypersonsVocDataset'
-classes = ('ignore', 'pedestrians', 'riders', 'sitting', 'other', 'group')
+classes = ('pedestrians', 'riders', 'sitting', 'other', 'group')
 data_root = 'data/cityscapes/'
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
@@ -37,7 +37,8 @@ data = dict(
         times=8,
         dataset=dict(
             type=dataset_type,
-            ann_file=data_root + 'ImageSets/Main/train.txt',
+            ann_file=
+            + 'ImageSets/Main/train.txt',
             img_prefix=data_root,
             pipeline=train_pipeline)),
     val=dict(
