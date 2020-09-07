@@ -37,8 +37,7 @@ data = dict(
         times=8,
         dataset=dict(
             type=dataset_type,
-            ann_file=
-            + 'ImageSets/Main/train.txt',
+            ann_file=data_root + 'ImageSets/Main/train.txt',
             img_prefix=data_root,
             pipeline=train_pipeline)),
     val=dict(
