@@ -69,4 +69,4 @@ test_cfg = dict(
     score_thr=0.05,
     nms=dict(type='nms', iou_threshold=0.5),
     max_per_img=100)
-optimizer = dict(lr=0.005)
+optimizer = dict(lr=0.0025)
