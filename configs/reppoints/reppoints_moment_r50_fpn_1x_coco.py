@@ -39,10 +39,10 @@ model = dict(
             alpha=0.25,
             loss_weight=1.0),
         loss_bbox_init=dict(type='SmoothL1Loss', beta=0.11, loss_weight=0.5),
-        loss_keypoint_init=dict(type='SmoothL1Loss', beta=0.11, loss_weight=0.1),
+        loss_keypoint_init=dict(type='SmoothL1Loss', beta=0.11, loss_weight=0.2),
         loss_bbox_refine=dict(type='SmoothL1Loss', beta=0.11, loss_weight=1.0),
-        loss_keypoint_refine=dict(type='SmoothL1Loss', beta=0.11, loss_weight=0.2),
-        keypoint_select=[0,7,8,9,10,13,14,15,16],
+        loss_keypoint_refine=dict(type='SmoothL1Loss', beta=0.11, loss_weight=0.4),
+        keypoint_select=[0,5,6,9,10,11,12,15,16],
         # 0:鼻子 1:左眼 2:右眼 3:左耳 4:右耳 5:左肩 6:右肩 7:左肘 8:右肘
         # 9:左腕 10:右腕 11:左臀 12:右臀 13:左膝 14:右膝 15:左踝 16:右踝
         transform_method='moment'))
@@ -69,4 +69,4 @@ test_cfg = dict(
     score_thr=0.05,
     nms=dict(type='nms', iou_threshold=0.5),
     max_per_img=100)
-optimizer = dict(lr=0.0025)
+optimizer = dict(lr=0.005)
