@@ -6,7 +6,7 @@ from .xml_style import XMLDataset
 @DATASETS.register_module()
 class CitypersonsVocDataset(XMLDataset):
 
-    CLASSES = ('pedestrians')
+    CLASSES = ('pedestrians', 'riders', 'sitting', 'other', 'group')
 
     def __init__(self, **kwargs):
         super(CitypersonsVocDataset, self).__init__(**kwargs)
